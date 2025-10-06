@@ -191,19 +191,15 @@ function noKudosForStats(stats, activityType, activityName, kudoRules) {
     }
 
     // Check for minimum distance
-    if (kudoRules.min_distance && kudoRules.min_distance[activityType] && stats.Distance) {
-        const distanceValue = parseInt(stats.Distance);
-        if (distanceValue < kudoRules.min_distance[activityType]) {
-            return true;
-        }
+    if (kudoRules.min_distance && kudoRules.min_distance[activityType]) {
+        if (!stats.Distance) return true;
+        if (parseInt(stats.Distance) < kudoRules.min_distance[activityType]) return true;
     }
 
     // Check for minimum time
-    if (kudoRules.min_time && kudoRules.min_time[activityType] && stats.Time) {
-        const timeValue = parseTimeToMinutes(stats.Time);
-        if (timeValue < kudoRules.min_time[activityType]) {
-            return true;
-        }
+    if (kudoRules.min_time && kudoRules.min_time[activityType]) {
+        if (!stats.Time) return true;
+        if (parseTimeToMinutes(stats.Time) < kudoRules.min_time[activityType]) return true;
     }
 
     return false;
