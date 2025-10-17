@@ -1,6 +1,9 @@
 import https from 'https';
-import { readFile } from 'fs/promises';
+import { readFile, access } from 'fs/promises';
+import { constants as fsConstants } from 'fs';
 import { decode } from 'html-entities';
+import path from 'path';
+import yaml from 'js-yaml';
 
 // const STRAVA_COOKIE = '3s35olf0ndd9gcmietdip371tgvmd33k';
 let COOKIE_VALUE = '';
@@ -11,9 +14,8 @@ async function main() {
     console.log('***** SKRIPT START *****');
 
     try {
-        var config = JSON.parse(await readFile('config.json', 'utf8'));
-        if (!config._strava4_session) throw new Error(`'_strava4_session' missing in config`);
-        if (!config.myAthleteID) throw new Error(`'myAthleteID' missing in config`);
+        const config = await loadConfig();
+        validateConfig(config);
 
         setCookieValue(config._strava4_session);
         const csrfToken = await getCsrfToken();
@@ -22,9 +24,87 @@ async function main() {
         const filteredActivities = filterActivities(activities, config);
         await sendKudos(csrfToken, filteredActivities);
     } catch (error) {
-        console.error(error);
+        logConfigError(error);
     }
     console.log('***** SKRIPT END *****');
+}
+
+/**
+ * Loads configuration from config.json, config.yaml, or config.yml in the project root.
+ * Enforces exclusivity: throws if more than one config file is present.
+ * @returns {Promise<Object>} Parsed config object
+ */
+async function loadConfig() {
+    const configFiles = [
+        'config.json',
+        'config.yaml',
+        'config.yml'
+    ];
+    const found = [];
+    for (const file of configFiles) {
+        try {
+            await access(path.resolve(file), fsConstants.F_OK);
+            found.push(file);
+        } catch (_) {}
+    }
+    if (found.length === 0) {
+        throw new Error(
+            'No configuration file found. Please provide one of: config.json, config.yaml, or config.yml in the project root.'
+        );
+    }
+    if (found.length > 1) {
+        throw new Error(
+            `Multiple configuration files found (${found.join(', ')}). Please ensure only one of config.json, config.yaml, or config.yml is present.`
+        );
+    }
+    const configFile = found[0];
+    let configRaw;
+    try {
+        configRaw = await readFile(configFile, 'utf8');
+    } catch (err) {
+        throw new Error(`Failed to read configuration file "${configFile}": ${err.message}`);
+    }
+    try {
+        if (configFile.endsWith('.json')) {
+            return JSON.parse(configRaw);
+        } else if (configFile.endsWith('.yaml') || configFile.endsWith('.yml')) {
+            return yaml.load(configRaw);
+        } else {
+            throw new Error(`Unsupported config file extension: ${configFile}`);
+        }
+    } catch (err) {
+        throw new Error(`Failed to parse configuration file "${configFile}": ${err.message}`);
+    }
+}
+
+/**
+ * Validates the loaded config object for required fields.
+ * Throws an error if validation fails.
+ * @param {Object} config
+ */
+function validateConfig(config) {
+    if (!config || typeof config !== 'object') {
+        throw new Error('Config is missing or not an object.');
+    }
+    if (!config._strava4_session) {
+        throw new Error(`'_strava4_session' missing in config`);
+    }
+    if (!config.myAthleteID) {
+        throw new Error(`'myAthleteID' missing in config`);
+    }
+    // Add more validation as needed for required fields
+}
+
+/**
+ * Logs config-related errors with user-friendly messages.
+ * @param {Error} error
+ */
+function logConfigError(error) {
+    if (error && error.message) {
+        console.error('[CONFIG ERROR]', error.message);
+    } else {
+        console.error('[CONFIG ERROR]', error);
+    }
 }
 
 function setCookieValue(cookieValue) {
