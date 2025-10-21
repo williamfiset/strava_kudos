@@ -5,13 +5,12 @@ import { decode } from 'html-entities';
 import path from 'path';
 import yaml from 'js-yaml';
 
-// const STRAVA_COOKIE = '3s35olf0ndd9gcmietdip371tgvmd33k';
 let COOKIE_VALUE = '';
 
 await main();
 
 async function main() {
-    console.log('***** SKRIPT START *****');
+    console.log('***** SCRIPT START *****');
 
     try {
         const config = await loadConfig();
@@ -26,7 +25,7 @@ async function main() {
     } catch (error) {
         logConfigError(error);
     }
-    console.log('***** SKRIPT END *****');
+    console.log('***** SCRIPT END *****');
 }
 
 /**
@@ -35,11 +34,7 @@ async function main() {
  * @returns {Promise<Object>} Parsed config object
  */
 async function loadConfig() {
-    const configFiles = [
-        'config.json',
-        'config.yaml',
-        'config.yml'
-    ];
+    const configFiles = ['config.json', 'config.yaml', 'config.yml'];
     const found = [];
     for (const file of configFiles) {
         try {
@@ -48,14 +43,10 @@ async function loadConfig() {
         } catch (_) {}
     }
     if (found.length === 0) {
-        throw new Error(
-            'No configuration file found. Please provide one of: config.json, config.yaml, or config.yml in the project root.'
-        );
+        throw new Error('No configuration file found. Please provide one of: config.json, config.yaml, or config.yml in the project root.');
     }
     if (found.length > 1) {
-        throw new Error(
-            `Multiple configuration files found (${found.join(', ')}). Please ensure only one of config.json, config.yaml, or config.yml is present.`
-        );
+        throw new Error(`Multiple configuration files found (${found.join(', ')}). Please ensure only one of config.json, config.yaml, or config.yml is present.`);
     }
     const configFile = found[0];
     let configRaw;
@@ -108,7 +99,7 @@ function logConfigError(error) {
 }
 
 function setCookieValue(cookieValue) {
-    console.log('StravaCookie: ' + cookieValue);
+    console.log('Strava Cookie: ' + cookieValue);
     COOKIE_VALUE = `_strava4_session=${cookieValue}`;
 }
 
@@ -184,7 +175,7 @@ async function getActivitiesViaDashboard(csrfToken, myAthleteID) {
             if (entry.entity === 'Activity') {
                 activities.push(entry.activity);
             } else if (entry.entity === 'GroupActivity') {
-                activities.push(...entry.rowData.activities.map(tranformGroupActivity));
+                activities.push(...entry.rowData.activities.map(transformGroupActivity));
             }
         });
     });
@@ -195,7 +186,7 @@ async function getActivitiesViaDashboard(csrfToken, myAthleteID) {
     return activities;
 }
 
-function tranformGroupActivity(activity) {
+function transformGroupActivity(activity) {
     return {
         ...activity,
         activityName: activity.name,
