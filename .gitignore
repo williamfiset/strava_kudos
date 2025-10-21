@@ -1,6 +1,5 @@
 /node_modules
 /.vscode
-config.json
 /archive
-.prettierrc
+config.json
 config.txt
