@@ -2,6 +2,8 @@
 
 A Node.js application designed to intelligently automate giving kudos to Strava activities based on configurable rules.
 
+[![Docker Image CI](https://github.com/aexel90/strava_kudos/actions/workflows/docker-image.yml/badge.svg)](https://github.com/aexel90/strava_kudos/actions/workflows/docker-image.yml)
+
 ## ✨ Features
 
 - **Smart Activity Filtering**: Configure rules based on activity type, distance, time, and name patterns
