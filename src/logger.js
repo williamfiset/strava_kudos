@@ -100,8 +100,8 @@ class Logger {
      * @param {string} sessionCookie - Session cookie to redact
      */
     logSession(sessionCookie) {
-        const redacted = this.redactCookie(sessionCookie);
-        this.info(`Strava Session: ${redacted}`);
+        const redacted = sessionCookie.length > 8 ? `${sessionCookie.substring(0, 8)}...` : '***REDACTED***';
+        this.debug(`Strava Session: ${redacted}`);
     }
 
     /**
@@ -111,18 +111,6 @@ class Logger {
     logCsrfToken(csrfToken) {
         const redacted = csrfToken.length > 8 ? `${csrfToken.substring(0, 8)}...` : '***REDACTED***';
         this.debug(`CSRF Token: ${redacted}`);
-    }
-
-    /**
-     * Redact sensitive cookie information
-     * @param {string} cookie - Cookie value to redact
-     * @returns {string} Redacted cookie
-     */
-    redactCookie(cookie) {
-        if (!cookie || cookie.length <= 12) {
-            return '***REDACTED***';
-        }
-        return `${cookie.substring(0, 8)}...${cookie.substring(cookie.length - 4)}`;
     }
 
     /**

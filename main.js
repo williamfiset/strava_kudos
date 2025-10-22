@@ -8,7 +8,6 @@ await main();
 
 async function main() {
     try {
-        // Parse command line arguments
         const options = parseArgs();
 
         if (options.help) {
@@ -16,26 +15,20 @@ async function main() {
             return;
         }
 
-        // Set log level based on verbose flag
-        if (options.verbose) {
-            logger.setLevel(LogLevel.DEBUG);
-        }
+        if (options.verbose) logger.setLevel(LogLevel.DEBUG);
 
         logger.logScriptBoundary(true);
 
-        // Load and validate configuration
         const config = await loadAndValidateConfig();
 
         // Initialize Strava client
         const stravaClient = new StravaClient(config.stravaSessionCookie);
+        await stravaClient.initialize();
         logger.logSession(config.stravaSessionCookie);
-
-        // Get CSRF token
-        const csrfToken = await stravaClient.getCsrfToken();
-        logger.logCsrfToken(csrfToken);
+        logger.logCsrfToken(stravaClient.csrfToken);
 
         // Fetch activities
-        const activities = await stravaClient.getActivitiesViaDashboard(csrfToken, config.athleteId);
+        const activities = await stravaClient.getActivitiesViaDashboard(config.athleteId);
         logger.info(`Found ${activities.length} activities`);
 
         // Filter activities based on rules
@@ -43,7 +36,6 @@ async function main() {
             dryRun: options.dryRun,
             verbose: options.verbose,
         });
-
         logger.logSummary(activities.length, filteredActivities.length, options.dryRun);
 
         // Send kudos (or simulate in dry run)
@@ -53,15 +45,13 @@ async function main() {
                 logger.info(`Would send kudos to: ${activity.athlete.athleteName} - ${activity.activityName}`);
             });
         } else {
-            await sendKudos(stravaClient, csrfToken, filteredActivities);
+            await sendKudos(stravaClient, filteredActivities);
         }
 
         logger.logScriptBoundary(false);
     } catch (error) {
         logger.error('Application error:', error.message);
-        if (error.message.includes('config') || error.message.includes('Config')) {
-            logConfigError(error);
-        }
+        if (error.message.includes('config') || error.message.includes('Config')) logConfigError(error);
         process.exit(1);
     }
 }
@@ -69,10 +59,9 @@ async function main() {
 /**
  * Send kudos to activities with basic rate limiting
  * @param {StravaClient} stravaClient - Strava client instance
- * @param {string} csrfToken - CSRF token
  * @param {Array} activities - Activities to send kudos to
  */
-async function sendKudos(stravaClient, csrfToken, activities) {
+async function sendKudos(stravaClient, activities) {
     let successCount = 0;
     let errorCount = 0;
     const defaultDelayMs = 1000; // Default 1 second delay
@@ -81,7 +70,7 @@ async function sendKudos(stravaClient, csrfToken, activities) {
         try {
             logger.info(`Sending kudos to activity ${index + 1}/${activities.length}: ${activity.athlete.athleteName} - ${activity.activityName}`);
 
-            const response = await stravaClient.sendKudos(csrfToken, activity.id);
+            const response = await stravaClient.sendKudos(activity.id);
             logger.debug('Kudos response:', response);
             successCount++;
 

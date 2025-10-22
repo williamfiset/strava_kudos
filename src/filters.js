@@ -45,24 +45,16 @@ export function filterActivities(activities, config, options = {}) {
  */
 function shouldSkipActivity(activity, config, stats) {
     // Skip own activities
-    if (activity.athlete.athleteId == config.athleteId) {
-        return "It's my own activity 😎";
-    }
+    if (activity.athlete.athleteId == config.athleteId) return "It's my own activity 😎";
 
     // Skip already kudoed activities
-    if (activity.kudosAndComments.hasKudoed) {
-        return 'Already kudoed this activity';
-    }
+    if (activity.kudosAndComments.hasKudoed) return 'Already kudoed this activity';
 
     // Skip ignored athletes
-    if (config.ignoreAthletes && config.ignoreAthletes.includes(activity.athlete.athleteId)) {
-        return 'Athlete is in ignore list';
-    }
+    if (config.ignoreAthletes && config.ignoreAthletes.includes(activity.athlete.athleteId)) return 'Athlete is in ignore list';
 
     // Check if activity meets kudo rules
-    if (config.kudoRules && shouldSkipForStats(stats, activity.type, activity.activityName, config.kudoRules)) {
-        return 'Activity stats do not meet criteria';
-    }
+    if (config.kudoRules && shouldSkipForStats(stats, activity.type, activity.activityName, config.kudoRules)) return 'Activity stats do not meet criteria';
 
     return null; // Don't skip
 }
@@ -80,9 +72,7 @@ function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
     if (kudoRules.activityNames && kudoRules.activityNames.length > 0) {
         for (const namePattern of kudoRules.activityNames) {
             const regex = new RegExp(namePattern, 'i');
-            if (regex.test(activityName)) {
-                return false; // Name matches, give kudos
-            }
+            if (regex.test(activityName)) return false; // Name matches, give kudos
         }
     }
 
@@ -91,9 +81,7 @@ function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
         if (!stats.Distance) return true;
 
         const distance = parseDistance(stats.Distance);
-        if (distance < kudoRules.minDistance[activityType]) {
-            return true;
-        }
+        if (distance < kudoRules.minDistance[activityType]) return true;
     }
 
     // Check minimum time requirements
@@ -101,9 +89,7 @@ function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
         if (!stats.Time) return true;
 
         const timeInMinutes = parseTimeToMinutes(stats.Time);
-        if (timeInMinutes < kudoRules.minTime[activityType]) {
-            return true;
-        }
+        if (timeInMinutes < kudoRules.minTime[activityType]) return true;
     }
 
     return false; // Meets all criteria, don't skip
@@ -114,12 +100,10 @@ function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
  * @param {Object} activityItem - Activity object containing stats
  * @returns {Object} Extracted statistics mapped by subtitle
  */
-export function extractActivityStats(activityItem) {
+function extractActivityStats(activityItem) {
     const stats = {};
 
-    if (!activityItem.stats || !Array.isArray(activityItem.stats)) {
-        return stats;
-    }
+    if (!activityItem.stats || !Array.isArray(activityItem.stats)) return stats;
 
     activityItem.stats.forEach((stat) => {
         const subtitleKey = `${stat.key}_subtitle`;
@@ -148,22 +132,15 @@ export function extractActivityStats(activityItem) {
  * @param {string} timeStr - Time string (e.g., "1h 30m", "45m")
  * @returns {number} Total minutes
  */
-export function parseTimeToMinutes(timeStr) {
-    if (!timeStr || typeof timeStr !== 'string') {
-        return 0;
-    }
+function parseTimeToMinutes(timeStr) {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
 
     let totalMinutes = 0;
     const hoursMatch = timeStr.match(/(\d+)\s*h/i);
     const minutesMatch = timeStr.match(/(\d+)\s*m/i);
 
-    if (hoursMatch) {
-        totalMinutes += parseInt(hoursMatch[1], 10) * 60;
-    }
-
-    if (minutesMatch) {
-        totalMinutes += parseInt(minutesMatch[1], 10);
-    }
+    if (hoursMatch) totalMinutes += parseInt(hoursMatch[1], 10) * 60;
+    if (minutesMatch) totalMinutes += parseInt(minutesMatch[1], 10);
 
     return totalMinutes;
 }
@@ -173,10 +150,8 @@ export function parseTimeToMinutes(timeStr) {
  * @param {string} distanceStr - Distance string (e.g., "5.2 km", "3.1 mi")
  * @returns {number} Distance as number
  */
-export function parseDistance(distanceStr) {
-    if (!distanceStr || typeof distanceStr !== 'string') {
-        return 0;
-    }
+function parseDistance(distanceStr) {
+    if (!distanceStr || typeof distanceStr !== 'string') return 0;
 
     // Extract numeric value from string
     const match = distanceStr.match(/(\d+\.?\d*)/);
