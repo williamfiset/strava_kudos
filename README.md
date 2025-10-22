@@ -145,19 +145,39 @@ npm start -- --dry-run --verbose
 
 ## 🐳 Docker Usage
 
+### Prerequisites
+
+Before using Docker, ensure you have a configuration file:
+
+```bash
+# Create config.yaml from example (recommended)
+cp config.yaml.example config.yaml
+# Edit config.yaml with your actual values
+
+# OR create config.json from example
+cp config.json.example config.json
+# Edit config.json with your actual values
+```
+
 ### Using Docker Compose
 
 The project includes two Docker Compose services:
+
+- **`strava_kudos`**: Uses pre-built image from GitHub Container Registry (recommended)
+- **`strava_kudos_local`**: Builds image locally from current source code
 
 ```bash
 # Run with GitHub Container Registry image (recommended)
 docker compose up -d strava_kudos
 
-# Build and run local image
+# Build and run local image (for development/testing)
 docker compose up -d --build strava_kudos_local
 
-# View logs
+# View logs in real-time
 docker compose logs -f strava_kudos
+
+# View logs from specific service
+docker compose logs -f strava_kudos_local
 
 # Stop services
 docker compose down
@@ -166,25 +186,78 @@ docker compose down
 ### Using Docker directly
 
 ```bash
-# Build image
-docker build -t strava-kudos .
+# Pull pre-built image
+docker pull ghcr.io/aexel90/strava_kudos:main
 
-# Run with config file (JSON or YAML)
-docker run -v $(pwd)/config.json:/app/config.json:ro strava-kudos
+# Run with config.yaml (default mount location)
+docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudos:main
 
-# Run with YAML config
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro strava-kudos
+# Run with config.json
+docker run -v $(pwd)/config.json:/app/config.json:ro ghcr.io/aexel90/strava_kudos:main
 
-# The container runs with verbose logging by default
+# Build local image
+docker build -t strava-kudos-local .
+
+# Run locally built image
+docker run -v $(pwd)/config.yaml:/app/config.yaml:ro strava-kudos-local
+
+# Run with dry-run mode (override default verbose flag)
+docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudos:main node main.js --dry-run --verbose
 ```
 
 ### Docker Configuration
 
-Both `docker-compose.yml` services support:
-- **Multiple config formats**: Mount either `config.json` or `config.yaml`
-- **Read-only volumes**: Config files are mounted as read-only for security
-- **Automatic restart**: Containers restart on failure (max 2 attempts)
-- **Verbose logging**: Containers run with `-v` flag by default
+#### Default Behavior
+- **Config file**: Both services mount `config.yaml` by default
+- **Logging**: Containers run with verbose logging (`-v` flag) by default
+- **Restart policy**: Containers restart on failure (max 2 attempts)
+- **Security**: Config files are mounted as read-only (`:ro` flag)
+
+#### Service Details
+- **`strava_kudos`**: 
+  - Uses `ghcr.io/aexel90/strava_kudos:main` image
+  - Always up-to-date with latest releases
+  - Faster startup (no build time)
+
+- **`strava_kudos_local`**: 
+  - Builds from local Dockerfile
+  - Uses your current source code
+  - Useful for development and testing changes
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **"No configuration file found"**
+   ```bash
+   # Ensure you have config.yaml in project root
+   ls -la config.yaml
+   
+   # Or create from example
+   cp config.yaml.example config.yaml
+   ```
+
+2. **Permission denied errors**
+   ```bash
+   # Check file permissions
+   chmod 644 config.yaml
+   ```
+
+3. **Container exits immediately**
+   ```bash
+   # Check logs for errors
+   docker compose logs strava_kudos
+   
+   # Run in dry-run mode for testing
+   docker compose run --rm strava_kudos node main.js --dry-run --verbose
+   ```
+
+4. **Using different config file**
+   ```bash
+   # Edit docker-compose.yml to mount config.json instead
+   volumes:
+     - ./config.json:/app/config.json:ro
+   ```
 
 ## 🏗️ Project Structure
 
