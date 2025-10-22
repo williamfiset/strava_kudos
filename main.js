@@ -1,4 +1,4 @@
-import { loadAndValidateConfig, logConfigError } from './src/config.js';
+import { loadAndValidateConfig } from './src/config.js';
 import { StravaClient } from './src/stravaClient.js';
 import { filterActivities } from './src/filters.js';
 import { logger, LogLevel } from './src/logger.js';
@@ -51,7 +51,6 @@ async function main() {
         logger.logScriptBoundary(false);
     } catch (error) {
         logger.error('Application error:', error.message);
-        if (error.message.includes('config') || error.message.includes('Config')) logConfigError(error);
         process.exit(1);
     }
 }
@@ -82,7 +81,6 @@ async function sendKudos(stravaClient, activities) {
         } catch (error) {
             logger.error(`Failed to send kudos to activity ${activity.id}:`, error.message);
             errorCount++;
-
             // Continue with other activities even if one fails
         }
     }

@@ -36,22 +36,17 @@ async function loadConfig() {
 
     for (const file of configFiles) {
         try {
-            await access(path.resolve(file), fsConstants.F_OK);
+            await access(file, fsConstants.F_OK);
             found.push(file);
-        } catch (_) {
-            // File doesn't exist, continue
-        }
+        } catch {} // File doesn't exist, continue to next
     }
 
-    if (found.length === 0) {
-        throw new Error('No configuration file found. Please provide one of: config.json, config.yaml, or config.yml in the project root.');
-    }
+    if (found.length === 0) throw new Error('No configuration file found. Please provide one of: config.json, config.yaml, or config.yml in the project root.');
 
     const configFile = found[0];
-    let configRaw;
-
     logger.info(`Using configuration file: ${configFile}`);
 
+    let configRaw;
     try {
         configRaw = await readFile(configFile, 'utf8');
     } catch (err) {
@@ -59,13 +54,9 @@ async function loadConfig() {
     }
 
     try {
-        if (configFile.endsWith('.json')) {
-            return JSON.parse(configRaw);
-        } else if (configFile.endsWith('.yaml') || configFile.endsWith('.yml')) {
-            return yaml.load(configRaw);
-        } else {
-            throw new Error(`Unsupported config file extension: ${configFile}`);
-        }
+        if (configFile.endsWith('.json')) return JSON.parse(configRaw);
+        else if (configFile.endsWith('.yaml') || configFile.endsWith('.yml')) return yaml.load(configRaw);
+        else throw new Error(`Unsupported config file extension: ${configFile}`);
     } catch (err) {
         throw new Error(`Failed to parse configuration file "${configFile}": ${err.message}`);
     }
@@ -76,43 +67,23 @@ async function loadConfig() {
  * @param {Object} config - Configuration object to validate
  */
 function validateConfig(config) {
-    if (!config || typeof config !== 'object') {
-        throw new Error('Config is missing or not an object.');
-    }
-
-    if (!config.stravaSessionCookie || typeof config.stravaSessionCookie !== 'string') {
-        throw new Error("'stravaSessionCookie' is missing or not a string in config");
-    }
-
-    if (!config.athleteId) {
-        throw new Error("'athleteId' is missing in config");
-    }
+    if (!config || typeof config !== 'object') throw new Error('Config is missing or not an object.');
+    if (!config.stravaSessionCookie || typeof config.stravaSessionCookie !== 'string') throw new Error("'stravaSessionCookie' is missing or not a string in config");
+    if (!config.athleteId) throw new Error("'athleteId' is missing in config");
 
     // Validate athleteId can be converted to number
-    if (isNaN(Number(config.athleteId))) {
-        throw new Error("'athleteId' must be a valid number");
-    }
+    if (isNaN(Number(config.athleteId))) throw new Error("'athleteId' must be a valid number");
 
     // Validate optional arrays
-    if (config.ignoreAthletes && !Array.isArray(config.ignoreAthletes)) {
-        throw new Error("'ignoreAthletes' must be an array if provided");
-    }
+    if (config.ignoreAthletes && !Array.isArray(config.ignoreAthletes)) throw new Error("'ignoreAthletes' must be an array if provided");
 
     // Validate kudoRules structure if present
     if (config.kudoRules) {
         const { kudoRules } = config;
 
-        if (kudoRules.minDistance && typeof kudoRules.minDistance !== 'object') {
-            throw new Error("'kudoRules.minDistance' must be an object if provided");
-        }
-
-        if (kudoRules.minTime && typeof kudoRules.minTime !== 'object') {
-            throw new Error("'kudoRules.minTime' must be an object if provided");
-        }
-
-        if (kudoRules.activityNames && !Array.isArray(kudoRules.activityNames)) {
-            throw new Error("'kudoRules.activityNames' must be an array if provided");
-        }
+        if (kudoRules.minDistance && typeof kudoRules.minDistance !== 'object') throw new Error("'kudoRules.minDistance' must be an object if provided");
+        if (kudoRules.minTime && typeof kudoRules.minTime !== 'object') throw new Error("'kudoRules.minTime' must be an object if provided");
+        if (kudoRules.activityNames && !Array.isArray(kudoRules.activityNames)) throw new Error("'kudoRules.activityNames' must be an array if provided");
     }
 }
 
@@ -132,16 +103,4 @@ function normalizeConfig(config) {
             activityNames: config.kudoRules?.activityNames || [],
         },
     };
-}
-
-/**
- * Logs config-related errors with user-friendly messages
- * @param {Error} error - Error to log
- */
-export function logConfigError(error) {
-    if (error && error.message) {
-        console.error('[CONFIG ERROR]', error.message);
-    } else {
-        console.error('[CONFIG ERROR]', error);
-    }
 }
