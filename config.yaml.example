@@ -1,19 +1,27 @@
-_strava4_session: "vj6---"
-myAthleteID: "11..."
-ignoreAthlete:
-  - "71..."
-  - "33..."
-  - "43..."
+stravaSessionCookie: "your-session-cookie"
+athleteId: "your-athlete-id"
+ignoreAthletes:
+  - "athlete-id-1"
+  - "athlete-id-2"
+  - "athlete-id-3"
 kudoRules:
-  min_distance:
+  minDistance:
     GroupActivity: 5
     Run: 5
-    Trail Run: 5
+    TrailRun: 5
     Ride: 20
-    Mountain Bike Ride: 20
-    Gravel Ride: 20
-    Virtual Ride: 20
-    Indoor Cycling: 20
-    Alpine Ski: 10
-  min_time:
+    MountainBikeRide: 20
+    GravelRide: 20
+    VirtualRide: 20
+    IndoorCycling: 20
+    AlpineSki: 10
+  minTime:
     Workout: 45
+    Walk: 60
+    Hike: 60
+    Swim: 30
+    WeightTraining: 45
+  activityNames:
+    - "race|marathon|competition"
+    - "birthday.*run"
+    - "charity"
