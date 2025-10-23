@@ -98,8 +98,8 @@ The app looks for config files in this order:
 stravaSessionCookie: "ab12cd34ef56gh78ij90kl12mn34op56"
 athleteId: "12345678"
 ignoreAthletes:
-  - "87654321"
-  - "11223344"
+  - "87654321" # Max Mustermann
+  - "11223344" # Sarah Mustermann
 kudoRules:
   minDistance:
     Run: 5
