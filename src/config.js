@@ -9,11 +9,14 @@ import yaml from 'js-yaml';
  * @property {string} stravaSessionCookie - Strava session cookie
  * @property {string|number} athleteId - User's athlete ID
  * @property {number[]} [ignoreAthletes] - Array of athlete IDs to ignore
+ * @property {number} [maxActivityAgeHours] - Skip activities older than this many hours. Defaults to 24. Set to 0 to disable.
  * @property {Object} [kudoRules] - Rules for giving kudos
  * @property {Object} [kudoRules.minDistance] - Minimum distance by activity type
  * @property {Object} [kudoRules.minTime] - Minimum time by activity type
  * @property {string[]} [kudoRules.activityNames] - Activity name patterns to always give kudos
  */
+
+const DEFAULT_MAX_ACTIVITY_AGE_HOURS = 24;
 
 /**
  * Loads and validates configuration from config files
@@ -77,6 +80,12 @@ function validateConfig(config) {
     // Validate optional arrays
     if (config.ignoreAthletes && !Array.isArray(config.ignoreAthletes)) throw new Error("'ignoreAthletes' must be an array if provided");
 
+    // Validate maxActivityAgeHours
+    if (config.maxActivityAgeHours !== undefined && config.maxActivityAgeHours !== null) {
+        const v = Number(config.maxActivityAgeHours);
+        if (!Number.isFinite(v) || v < 0) throw new Error("'maxActivityAgeHours' must be a non-negative number if provided");
+    }
+
     // Validate kudoRules structure if present
     if (config.kudoRules) {
         const { kudoRules } = config;
@@ -97,6 +106,7 @@ function normalizeConfig(config) {
         stravaSessionCookie: config.stravaSessionCookie,
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
+        maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,
         kudoRules: {
             minDistance: config.kudoRules?.minDistance || {},
             minTime: config.kudoRules?.minTime || {},

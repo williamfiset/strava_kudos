@@ -51,6 +51,7 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 ### Optional Fields
 
 - **`ignoreAthletes`**: Array of athlete IDs to never give kudos to
+- **`maxActivityAgeHours`**: Skip activities older than this many hours. Defaults to `24`. Set to `0` to disable.
 - **`kudoRules`**: Object containing filtering rules:
   - **`minDistance`**: Minimum distance by activity type (e.g., `{"Run": 5, "Ride": 20}`)
   - **`minTime`**: Minimum duration in minutes by activity type (e.g., `{"Run": 30, "Ride": 60}`)

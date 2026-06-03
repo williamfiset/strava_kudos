@@ -111,6 +111,7 @@ function parseActivitiesFromDashboard(htmlData) {
             const entries = reactProps?.appContext?.feedProps?.preFetchedEntries || [];
 
             entries.forEach((entry) => {
+                console.log(entry.activity)
                 if (entry.entity === 'Activity') activities.push(entry.activity);
                 else if (entry.entity === 'GroupActivity') activities.push(...entry.rowData.activities.map(transformGroupActivity));
             });

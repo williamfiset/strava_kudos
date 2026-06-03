@@ -2,21 +2,29 @@
  * Activity filtering and validation utilities
  */
 import { logger } from './logger.js';
+import { getLastAction } from './athleteState.js';
 
 /**
- * Filter activities based on configuration rules
+ * Filter activities based on configuration rules and per-athlete alternation state.
+ * Processes activities oldest-first (by id) so that state reflects the newest decision.
+ *
  * @param {Array} activities - Array of activities to filter
  * @param {Object} config - Configuration object with filtering rules
+ * @param {Object} state - Per-athlete state used for alternation
  * @param {Object} [options] - Filtering options
- * @param {boolean} [options.dryRun=false] - Whether this is a dry run
- * @param {boolean} [options.verbose=false] - Whether to log detailed information
- * @returns {Array} Filtered activities that should receive kudos
+ * @param {boolean} [options.dryRun=false]
+ * @param {boolean} [options.verbose=false]
+ * @returns {{toKudo: Array, alternationSkipped: Array}}
  */
-export function filterActivities(activities, config, options = {}) {
-    const { dryRun = false, verbose = false } = options;
-    const filteredActivities = [];
+export function filterActivities(activities, config, state, options = {}) {
+    const { dryRun = false } = options;
+    const toKudo = [];
+    const alternationSkipped = [];
 
-    activities.forEach((activityItem) => {
+    // Sort oldest first so alternation decisions cascade in chronological order.
+    const sorted = [...activities].sort((a, b) => Number(a.id) - Number(b.id));
+
+    sorted.forEach((activityItem) => {
         const stats = extractActivityStats(activityItem);
         const reason = shouldSkipActivity(activityItem, config, stats);
 
@@ -27,36 +35,72 @@ export function filterActivities(activities, config, options = {}) {
             return;
         }
 
-        const actionText = dryRun ? 'Would give kudos' : 'Will give kudos';
-        logger.debug(`+++ ${actionText}`);
+        // Whitelisted names bypass the every-other rule.
+        const whitelisted = matchesWhitelist(activityItem.activityName, config.kudoRules);
 
-        filteredActivities.push(activityItem);
+        if (!whitelisted) {
+            const lastAction = getLastAction(state, activityItem.athlete.athleteId);
+            if (lastAction === 'kudoed') {
+                logger.debug(`--- Alternation: skipping (last action for this athlete was 'kudoed')`);
+                alternationSkipped.push(activityItem);
+                return;
+            }
+        }
+
+        const actionText = dryRun ? 'Would give kudos' : 'Will give kudos';
+        logger.debug(`+++ ${actionText}${whitelisted ? ' (whitelist override)' : ''}`);
+        toKudo.push(activityItem);
     });
 
-    return filteredActivities;
+    return { toKudo, alternationSkipped };
 }
 
 /**
- * Determine if an activity should be skipped for kudos
+ * Determine if an activity should be skipped for kudos based on the base rules.
  * @param {Object} activity - Activity object
  * @param {Object} config - Configuration object
  * @param {Object} stats - Extracted activity stats
  * @returns {string|null} Reason to skip, or null if should not skip
  */
 function shouldSkipActivity(activity, config, stats) {
-    // Skip own activities
     if (activity.athlete.athleteId == config.athleteId) return "It's my own activity 😎";
-
-    // Skip already kudoed activities
     if (activity.kudosAndComments.hasKudoed) return 'Already kudoed this activity';
-
-    // Skip ignored athletes
     if (config.ignoreAthletes && config.ignoreAthletes.includes(activity.athlete.athleteId)) return 'Athlete is in ignore list';
-
-    // Check if activity meets kudo rules
+    if (config.maxActivityAgeHours > 0) {
+        const ageHours = getActivityAgeHours(activity);
+        if (ageHours !== null && ageHours > config.maxActivityAgeHours) return `Activity is too old (${ageHours.toFixed(1)}h > ${config.maxActivityAgeHours}h)`;
+    }
     if (config.kudoRules && shouldSkipForStats(stats, activity.type, activity.activityName, config.kudoRules)) return 'Activity stats do not meet criteria';
+    return null;
+}
 
-    return null; // Don't skip
+/**
+ * Get the age of an activity in hours, or null if no parseable timestamp exists.
+ * Uses `startDate` (individual activities) with a `start_date` fallback for GroupActivity shapes.
+ * @param {Object} activity
+ * @returns {number|null}
+ */
+function getActivityAgeHours(activity) {
+    const raw = activity.startDate || activity.start_date;
+    if (!raw) return null;
+    const ts = new Date(raw).getTime();
+    if (Number.isNaN(ts)) return null;
+    return (Date.now() - ts) / (1000 * 60 * 60);
+}
+
+/**
+ * Check if an activity's title matches any whitelist regex.
+ * @param {string} activityName
+ * @param {Object} [kudoRules]
+ * @returns {boolean}
+ */
+function matchesWhitelist(activityName, kudoRules) {
+    if (!kudoRules?.activityNames?.length) return false;
+    for (const namePattern of kudoRules.activityNames) {
+        const regex = new RegExp(namePattern, 'i');
+        if (regex.test(activityName)) return true;
+    }
+    return false;
 }
 
 /**
@@ -68,31 +112,22 @@ function shouldSkipActivity(activity, config, stats) {
  * @returns {boolean} True if should skip, false otherwise
  */
 function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
-    // Check activity name patterns (if matches, don't skip)
-    if (kudoRules.activityNames && kudoRules.activityNames.length > 0) {
-        for (const namePattern of kudoRules.activityNames) {
-            const regex = new RegExp(namePattern, 'i');
-            if (regex.test(activityName)) return false; // Name matches, give kudos
-        }
-    }
+    // Whitelisted names bypass the distance/time gates.
+    if (matchesWhitelist(activityName, kudoRules)) return false;
 
-    // Check minimum distance requirements
     if (kudoRules.minDistance && kudoRules.minDistance[activityType]) {
         if (!stats.Distance) return true;
-
         const distance = parseDistance(stats.Distance);
         if (distance < kudoRules.minDistance[activityType]) return true;
     }
 
-    // Check minimum time requirements
     if (kudoRules.minTime && kudoRules.minTime[activityType]) {
         if (!stats.Time) return true;
-
         const timeInMinutes = parseTimeToMinutes(stats.Time);
         if (timeInMinutes < kudoRules.minTime[activityType]) return true;
     }
 
-    return false; // Meets all criteria, don't skip
+    return false;
 }
 
 /**
@@ -109,7 +144,6 @@ function extractActivityStats(activityItem) {
         const subtitleKey = `${stat.key}_subtitle`;
         let subtitle;
 
-        // Find corresponding subtitle
         for (const s of activityItem.stats) {
             if (s.key === subtitleKey) {
                 subtitle = s.value;
@@ -118,7 +152,6 @@ function extractActivityStats(activityItem) {
         }
 
         if (subtitle && stat.value) {
-            // Clean HTML tags and whitespace from value
             const value = stat.value.replace(/<[^>]*>/g, '').trim();
             stats[subtitle] = value;
         }
@@ -153,7 +186,6 @@ function parseTimeToMinutes(timeStr) {
 function parseDistance(distanceStr) {
     if (!distanceStr || typeof distanceStr !== 'string') return 0;
 
-    // Extract numeric value from string
     const match = distanceStr.match(/(\d+\.?\d*)/);
     return match ? parseFloat(match[1]) : 0;
 }
