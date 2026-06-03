@@ -53,7 +53,8 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 
 ### Required Fields
 
-- **`stravaSessionCookie`**: Your Strava session cookie (find this in your browser's developer tools)
+- **`stravaEmail`**: Your Strava account email. The app logs in with a real browser (Playwright/Firefox) and obtains a session cookie automatically.
+- **`stravaPassword`**: Your Strava account password.
 - **`athleteId`**: Your Strava athlete ID (number)
 
 ### Optional Fields
@@ -78,7 +79,8 @@ The app looks for config files in this order:
 
 ```json
 {
-  "stravaSessionCookie": "ab12cd34ef56gh78ij90kl12mn34op56",
+  "stravaEmail": "you@example.com",
+  "stravaPassword": "your-strava-password",
   "athleteId": "12345678",
   "ignoreAthletes": ["87654321", "11223344"],
   "kudoRules": {
@@ -104,7 +106,8 @@ The app looks for config files in this order:
 ### Example YAML Configuration
 
 ```yaml
-stravaSessionCookie: "ab12cd34ef56gh78ij90kl12mn34op56"
+stravaEmail: "you@example.com"
+stravaPassword: "your-strava-password"
 athleteId: "12345678"
 ignoreAthletes:
   - "87654321" # Max Mustermann
@@ -328,17 +331,22 @@ The application is written in **TypeScript** and follows a **modular ES module a
 1. **"No configuration file found"**
    - Ensure you have `config.json`, `config.yaml`, or `config.yml` in the project root
 
-2. **"No activities found"**
-   - Check that your session cookie is valid
+2. **"Login did not complete"**
+   - Double-check `stravaEmail` / `stravaPassword` in your config
+   - Strava may present a reCAPTCHA challenge; construct the browser with `{ headless: false }` to solve it manually in a visible window
+   - Run with `-v` / `--verbose` to see each login step
+
+3. **"No activities found"**
    - Ensure you're following accounts with recent activities
 
-3. **Network timeouts**
+4. **Network timeouts**
    - The app includes 30-second timeouts by default
    - Check your internet connection
 
-### Getting Your Session Cookie
+### Authentication
 
-1. Open Strava in your browser and log in
-2. Open Developer Tools (F12)
-3. Go to Application/Storage → Cookies → https://www.strava.com
-4. Find the `_strava4_session` cookie and copy its value (use as `stravaSessionCookie` in config)
+The app logs in to Strava with your `stravaEmail` / `stravaPassword` using a real Firefox browser (via Playwright) and uses the resulting `_strava4_session` cookie automatically — no need to copy a cookie from your browser. The Firefox binary must be installed once:
+
+```bash
+npx playwright install firefox
+```

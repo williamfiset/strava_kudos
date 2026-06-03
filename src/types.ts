@@ -14,7 +14,10 @@ export interface KudoRules {
 
 /** Fully normalized configuration consumed by the application. */
 export interface Config {
-    stravaSessionCookie: string;
+    /** Strava account email; used to log in via the browser and obtain a session cookie. */
+    stravaEmail: string;
+    /** Strava account password; used to log in via the browser and obtain a session cookie. */
+    stravaPassword: string;
     athleteId: number;
     ignoreAthletes: (string | number)[];
     maxActivityAgeHours: number;
@@ -23,7 +26,8 @@ export interface Config {
 
 /** Configuration as read from disk, before normalization/defaults. */
 export interface RawConfig {
-    stravaSessionCookie: string;
+    stravaEmail: string;
+    stravaPassword: string;
     athleteId: string | number;
     ignoreAthletes?: (string | number)[];
     maxActivityAgeHours?: number | null;

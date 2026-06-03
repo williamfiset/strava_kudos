@@ -1,5 +1,6 @@
 {
-    "stravaSessionCookie": "your-session-cookie",
+    "stravaEmail": "your-strava-email",
+    "stravaPassword": "your-strava-password",
     "athleteId": "your-athlete-id",
     "ignoreAthletes": [
         "athlete-id-1",
