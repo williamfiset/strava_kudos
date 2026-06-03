@@ -279,7 +279,6 @@ strava_kudos/
 │   ├── main.ts               # Main application entry point
 │   ├── config.ts             # Configuration loading and validation
 │   ├── stravaClient.ts       # Strava API client with timeout handling
-│   ├── browser.ts            # Email/password login to obtain a session cookie
 │   ├── filters.ts            # Activity filtering logic with debug logging
 │   ├── athleteState.ts       # Per-athlete alternation state persistence
 │   ├── logger.ts             # Winston-based logging with redaction
@@ -304,7 +303,6 @@ The application is written in **TypeScript** and follows a **modular ES module a
 - **`src/main.ts`**: Orchestrates the application flow and coordinates modules
 - **`src/config.ts`**: Handles configuration loading, validation, and normalization
 - **`src/stravaClient.ts`**: HTTP client with 30-second timeouts and error handling
-- **`src/browser.ts`**: Logs in with email/password to obtain a `_strava4_session` cookie
 - **`src/filters.ts`**: Activity filtering with detailed debug logging and statistics
 - **`src/athleteState.ts`**: Loads/saves per-athlete alternation state
 - **`src/logger.ts`**: Winston-based logging with timestamp, colors, and sensitive data redaction
