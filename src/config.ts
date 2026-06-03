@@ -1,41 +1,29 @@
 import { readFile, access } from 'fs/promises';
 import { constants as fsConstants } from 'fs';
 import { logger } from './logger.js';
-import path from 'path';
 import yaml from 'js-yaml';
-
-/**
- * @typedef {Object} Config
- * @property {string} stravaSessionCookie - Strava session cookie
- * @property {string|number} athleteId - User's athlete ID
- * @property {number[]} [ignoreAthletes] - Array of athlete IDs to ignore
- * @property {number} [maxActivityAgeHours] - Skip activities older than this many hours. Defaults to 24. Set to 0 to disable.
- * @property {Object} [kudoRules] - Rules for giving kudos
- * @property {Object} [kudoRules.minDistance] - Minimum distance by activity type
- * @property {Object} [kudoRules.minTime] - Minimum time by activity type
- * @property {string[]} [kudoRules.activityNames] - Activity name patterns to always give kudos
- */
+import type { Config, RawConfig } from './types.js';
 
 const DEFAULT_MAX_ACTIVITY_AGE_HOURS = 24;
 
 /**
  * Loads and validates configuration from config files
- * @returns {Promise<Config>} Validated configuration object
+ * @returns Validated configuration object
  */
-export async function loadAndValidateConfig() {
-    const config = await loadConfig();
-    validateConfig(config);
-    return normalizeConfig(config);
+export async function loadAndValidateConfig(): Promise<Config> {
+    const raw = await loadConfig();
+    const validated = validateConfig(raw);
+    return normalizeConfig(validated);
 }
 
 /**
  * Loads configuration from config.json, config.yaml, or config.yml in the project root.
  * Enforces exclusivity: throws if more than one config file is present.
- * @returns {Promise<Object>} Parsed config object
+ * @returns Parsed config object
  */
-async function loadConfig() {
+async function loadConfig(): Promise<unknown> {
     const configFiles = ['config.json', 'config.yaml', 'config.yml'];
-    const found = [];
+    const found: string[] = [];
 
     for (const file of configFiles) {
         try {
@@ -49,11 +37,12 @@ async function loadConfig() {
     const configFile = found[0];
     logger.info(`Using configuration file: ${configFile}`);
 
-    let configRaw;
+    let configRaw: string;
     try {
         configRaw = await readFile(configFile, 'utf8');
     } catch (err) {
-        throw new Error(`Failed to read configuration file "${configFile}": ${err.message}`);
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to read configuration file "${configFile}": ${message}`);
     }
 
     try {
@@ -61,47 +50,54 @@ async function loadConfig() {
         else if (configFile.endsWith('.yaml') || configFile.endsWith('.yml')) return yaml.load(configRaw);
         else throw new Error(`Unsupported config file extension: ${configFile}`);
     } catch (err) {
-        throw new Error(`Failed to parse configuration file "${configFile}": ${err.message}`);
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Failed to parse configuration file "${configFile}": ${message}`);
     }
 }
 
 /**
  * Validates the loaded config object for required fields and correct types
- * @param {Object} config - Configuration object to validate
+ * @param config - Configuration object to validate
+ * @returns The validated config, narrowed to RawConfig
  */
-function validateConfig(config) {
+function validateConfig(config: unknown): RawConfig {
     if (!config || typeof config !== 'object') throw new Error('Config is missing or not an object.');
-    if (!config.stravaSessionCookie || typeof config.stravaSessionCookie !== 'string') throw new Error("'stravaSessionCookie' is missing or not a string in config");
-    if (!config.athleteId) throw new Error("'athleteId' is missing in config");
+
+    const c = config as RawConfig;
+
+    if (!c.stravaSessionCookie || typeof c.stravaSessionCookie !== 'string') throw new Error("'stravaSessionCookie' is missing or not a string in config");
+    if (!c.athleteId) throw new Error("'athleteId' is missing in config");
 
     // Validate athleteId can be converted to number
-    if (isNaN(Number(config.athleteId))) throw new Error("'athleteId' must be a valid number");
+    if (isNaN(Number(c.athleteId))) throw new Error("'athleteId' must be a valid number");
 
     // Validate optional arrays
-    if (config.ignoreAthletes && !Array.isArray(config.ignoreAthletes)) throw new Error("'ignoreAthletes' must be an array if provided");
+    if (c.ignoreAthletes && !Array.isArray(c.ignoreAthletes)) throw new Error("'ignoreAthletes' must be an array if provided");
 
     // Validate maxActivityAgeHours
-    if (config.maxActivityAgeHours !== undefined && config.maxActivityAgeHours !== null) {
-        const v = Number(config.maxActivityAgeHours);
+    if (c.maxActivityAgeHours !== undefined && c.maxActivityAgeHours !== null) {
+        const v = Number(c.maxActivityAgeHours);
         if (!Number.isFinite(v) || v < 0) throw new Error("'maxActivityAgeHours' must be a non-negative number if provided");
     }
 
     // Validate kudoRules structure if present
-    if (config.kudoRules) {
-        const { kudoRules } = config;
+    if (c.kudoRules) {
+        const { kudoRules } = c;
 
         if (kudoRules.minDistance && typeof kudoRules.minDistance !== 'object') throw new Error("'kudoRules.minDistance' must be an object if provided");
         if (kudoRules.minTime && typeof kudoRules.minTime !== 'object') throw new Error("'kudoRules.minTime' must be an object if provided");
         if (kudoRules.activityNames && !Array.isArray(kudoRules.activityNames)) throw new Error("'kudoRules.activityNames' must be an array if provided");
     }
+
+    return c;
 }
 
 /**
  * Normalizes configuration values and provides defaults
- * @param {Object} config - Raw configuration object
- * @returns {Config} Normalized configuration
+ * @param config - Raw configuration object
+ * @returns Normalized configuration
  */
-function normalizeConfig(config) {
+function normalizeConfig(config: RawConfig): Config {
     return {
         stravaSessionCookie: config.stravaSessionCookie,
         athleteId: Number(config.athleteId),

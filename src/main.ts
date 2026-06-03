@@ -1,13 +1,14 @@
-import { loadAndValidateConfig } from './src/config.js';
-import { StravaClient } from './src/stravaClient.js';
-import { filterActivities } from './src/filters.js';
-import { logger, LogLevel } from './src/logger.js';
-import { parseArgs, showHelp, sleep } from './src/cli.js';
-import { loadAthleteState, saveAthleteState, recordAction } from './src/athleteState.js';
+import { loadAndValidateConfig } from './config.js';
+import { StravaClient } from './stravaClient.js';
+import { filterActivities } from './filters.js';
+import { logger, LogLevel } from './logger.js';
+import { parseArgs, showHelp, sleep } from './cli.js';
+import { loadAthleteState, saveAthleteState, recordAction } from './athleteState.js';
+import type { Activity, AthleteState } from './types.js';
 
 await main();
 
-async function main() {
+async function main(): Promise<void> {
     try {
         const options = parseArgs();
 
@@ -26,7 +27,7 @@ async function main() {
         const stravaClient = new StravaClient(config.stravaSessionCookie);
         await stravaClient.initialize();
         logger.logSession(config.stravaSessionCookie);
-        logger.logCsrfToken(stravaClient.csrfToken);
+        logger.logCsrfToken(stravaClient.csrfToken!);
 
         // Fetch activities
         const activities = await stravaClient.getActivitiesViaDashboard(config.athleteId);
@@ -63,7 +64,7 @@ async function main() {
 
         logger.logScriptBoundary(false);
     } catch (error) {
-        logger.error('Application error:', error.message);
+        logger.error('Application error:', error instanceof Error ? error.message : String(error));
         process.exit(1);
     }
 }
@@ -73,11 +74,11 @@ async function main() {
  * Records a 'kudoed' state entry only after a successful send so that
  * failed sends are retried (and not falsely treated as alternation anchors) on the next run.
  *
- * @param {StravaClient} stravaClient - Strava client instance
- * @param {Array} activities - Activities to send kudos to
- * @param {Object} athleteState - State object mutated on successful sends
+ * @param stravaClient - Strava client instance
+ * @param activities - Activities to send kudos to
+ * @param athleteState - State object mutated on successful sends
  */
-async function sendKudos(stravaClient, activities, athleteState) {
+async function sendKudos(stravaClient: StravaClient, activities: Activity[], athleteState: AthleteState): Promise<void> {
     let successCount = 0;
     let errorCount = 0;
     const defaultDelayMs = 1000; // Default 1 second delay
@@ -97,7 +98,7 @@ async function sendKudos(stravaClient, activities, athleteState) {
                 await sleep(defaultDelayMs);
             }
         } catch (error) {
-            logger.error(`Failed to send kudos to activity ${activity.id}:`, error.message);
+            logger.error(`Failed to send kudos to activity ${activity.id}:`, error instanceof Error ? error.message : String(error));
             errorCount++;
             // Continue with other activities even if one fails
         }

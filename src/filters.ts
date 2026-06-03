@@ -3,23 +3,31 @@
  */
 import { logger } from './logger.js';
 import { getLastAction } from './athleteState.js';
+import type { Activity, ActivityStats, AthleteState, Config, KudoRules } from './types.js';
+
+interface FilterOptions {
+    dryRun?: boolean;
+    verbose?: boolean;
+}
+
+interface FilterResult {
+    toKudo: Activity[];
+    alternationSkipped: Activity[];
+}
 
 /**
  * Filter activities based on configuration rules and per-athlete alternation state.
  * Processes activities oldest-first (by id) so that state reflects the newest decision.
  *
- * @param {Array} activities - Array of activities to filter
- * @param {Object} config - Configuration object with filtering rules
- * @param {Object} state - Per-athlete state used for alternation
- * @param {Object} [options] - Filtering options
- * @param {boolean} [options.dryRun=false]
- * @param {boolean} [options.verbose=false]
- * @returns {{toKudo: Array, alternationSkipped: Array}}
+ * @param activities - Array of activities to filter
+ * @param config - Configuration object with filtering rules
+ * @param state - Per-athlete state used for alternation
+ * @param options - Filtering options
  */
-export function filterActivities(activities, config, state, options = {}) {
+export function filterActivities(activities: Activity[], config: Config, state: AthleteState, options: FilterOptions = {}): FilterResult {
     const { dryRun = false } = options;
-    const toKudo = [];
-    const alternationSkipped = [];
+    const toKudo: Activity[] = [];
+    const alternationSkipped: Activity[] = [];
 
     // Sort oldest first so alternation decisions cascade in chronological order.
     const sorted = [...activities].sort((a, b) => Number(a.id) - Number(b.id));
@@ -57,12 +65,9 @@ export function filterActivities(activities, config, state, options = {}) {
 
 /**
  * Determine if an activity should be skipped for kudos based on the base rules.
- * @param {Object} activity - Activity object
- * @param {Object} config - Configuration object
- * @param {Object} stats - Extracted activity stats
- * @returns {string|null} Reason to skip, or null if should not skip
+ * @returns Reason to skip, or null if should not skip
  */
-function shouldSkipActivity(activity, config, stats) {
+function shouldSkipActivity(activity: Activity, config: Config, stats: ActivityStats): string | null {
     if (activity.athlete.athleteId == config.athleteId) return "It's my own activity 😎";
     if (activity.kudosAndComments.hasKudoed) return 'Already kudoed this activity';
     if (config.ignoreAthletes && config.ignoreAthletes.includes(activity.athlete.athleteId)) return 'Athlete is in ignore list';
@@ -77,10 +82,8 @@ function shouldSkipActivity(activity, config, stats) {
 /**
  * Get the age of an activity in hours, or null if no parseable timestamp exists.
  * Uses `startDate` (individual activities) with a `start_date` fallback for GroupActivity shapes.
- * @param {Object} activity
- * @returns {number|null}
  */
-function getActivityAgeHours(activity) {
+function getActivityAgeHours(activity: Activity): number | null {
     const raw = activity.startDate || activity.start_date;
     if (!raw) return null;
     const ts = new Date(raw).getTime();
@@ -90,11 +93,8 @@ function getActivityAgeHours(activity) {
 
 /**
  * Check if an activity's title matches any whitelist regex.
- * @param {string} activityName
- * @param {Object} [kudoRules]
- * @returns {boolean}
  */
-function matchesWhitelist(activityName, kudoRules) {
+function matchesWhitelist(activityName: string, kudoRules?: KudoRules): boolean {
     if (!kudoRules?.activityNames?.length) return false;
     for (const namePattern of kudoRules.activityNames) {
         const regex = new RegExp(namePattern, 'i');
@@ -105,23 +105,19 @@ function matchesWhitelist(activityName, kudoRules) {
 
 /**
  * Check if activity should be skipped based on statistical rules
- * @param {Object} stats - Activity statistics
- * @param {string} activityType - Type of activity
- * @param {string} activityName - Name of activity
- * @param {Object} kudoRules - Rules for giving kudos
- * @returns {boolean} True if should skip, false otherwise
+ * @returns True if should skip, false otherwise
  */
-function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
+function shouldSkipForStats(stats: ActivityStats, activityType: string | undefined, activityName: string, kudoRules: KudoRules): boolean {
     // Whitelisted names bypass the distance/time gates.
     if (matchesWhitelist(activityName, kudoRules)) return false;
 
-    if (kudoRules.minDistance && kudoRules.minDistance[activityType]) {
+    if (activityType && kudoRules.minDistance && kudoRules.minDistance[activityType]) {
         if (!stats.Distance) return true;
         const distance = parseDistance(stats.Distance);
         if (distance < kudoRules.minDistance[activityType]) return true;
     }
 
-    if (kudoRules.minTime && kudoRules.minTime[activityType]) {
+    if (activityType && kudoRules.minTime && kudoRules.minTime[activityType]) {
         if (!stats.Time) return true;
         const timeInMinutes = parseTimeToMinutes(stats.Time);
         if (timeInMinutes < kudoRules.minTime[activityType]) return true;
@@ -132,19 +128,18 @@ function shouldSkipForStats(stats, activityType, activityName, kudoRules) {
 
 /**
  * Extract activity statistics from activity object
- * @param {Object} activityItem - Activity object containing stats
- * @returns {Object} Extracted statistics mapped by subtitle
+ * @returns Extracted statistics mapped by subtitle
  */
-function extractActivityStats(activityItem) {
-    const stats = {};
+function extractActivityStats(activityItem: Activity): ActivityStats {
+    const stats: ActivityStats = {};
 
     if (!activityItem.stats || !Array.isArray(activityItem.stats)) return stats;
 
     activityItem.stats.forEach((stat) => {
         const subtitleKey = `${stat.key}_subtitle`;
-        let subtitle;
+        let subtitle: string | undefined;
 
-        for (const s of activityItem.stats) {
+        for (const s of activityItem.stats!) {
             if (s.key === subtitleKey) {
                 subtitle = s.value;
                 break;
@@ -162,10 +157,10 @@ function extractActivityStats(activityItem) {
 
 /**
  * Parse time string to minutes
- * @param {string} timeStr - Time string (e.g., "1h 30m", "45m")
- * @returns {number} Total minutes
+ * @param timeStr - Time string (e.g., "1h 30m", "45m")
+ * @returns Total minutes
  */
-function parseTimeToMinutes(timeStr) {
+function parseTimeToMinutes(timeStr: string): number {
     if (!timeStr || typeof timeStr !== 'string') return 0;
 
     let totalMinutes = 0;
@@ -180,10 +175,10 @@ function parseTimeToMinutes(timeStr) {
 
 /**
  * Parse distance string to numeric value
- * @param {string} distanceStr - Distance string (e.g., "5.2 km", "3.1 mi")
- * @returns {number} Distance as number
+ * @param distanceStr - Distance string (e.g., "5.2 km", "3.1 mi")
+ * @returns Distance as number
  */
-function parseDistance(distanceStr) {
+function parseDistance(distanceStr: string): number {
     if (!distanceStr || typeof distanceStr !== 'string') return 0;
 
     const match = distanceStr.match(/(\d+\.?\d*)/);

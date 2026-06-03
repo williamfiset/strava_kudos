@@ -1,26 +1,33 @@
 import https from 'https';
+import type { IncomingMessage } from 'http';
 import { decode } from 'html-entities';
+import type { Activity } from './types.js';
+
+interface StravaClientOptions {
+    timeout?: number;
+}
 
 /**
  * Internal helper function to make HTTP requests
- * @param {Object} options - Request options
- * @param {number} timeout - Request timeout in milliseconds
- * @returns {Promise<string>} Response data
+ * @param options - Request options
+ * @param timeout - Request timeout in milliseconds
+ * @returns Response data
  */
-function makeRequest(options, timeout) {
+function makeRequest(options: https.RequestOptions, timeout: number): Promise<string> {
     return new Promise((resolve, reject) => {
-        const requestOptions = {
+        const requestOptions: https.RequestOptions = {
             ...options,
             timeout: timeout,
         };
 
-        const req = https.request(requestOptions, (res) => {
+        const req = https.request(requestOptions, (res: IncomingMessage) => {
             let data = '';
 
             // Handle non-200 status codes
-            if (res.statusCode < 200 || res.statusCode >= 300) {
-                const error = new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`);
-                error.statusCode = res.statusCode;
+            const statusCode = res.statusCode ?? 0;
+            if (statusCode < 200 || statusCode >= 300) {
+                const error: Error & { statusCode?: number } = new Error(`HTTP ${statusCode}: ${res.statusMessage}`);
+                error.statusCode = statusCode;
                 reject(error);
                 return;
             }
@@ -50,12 +57,12 @@ function makeRequest(options, timeout) {
 
 /**
  * Get CSRF token from Strava dashboard
- * @param {string} cookieValue - Session cookie value
- * @param {number} timeout - Request timeout in milliseconds
- * @returns {Promise<string>} CSRF token
+ * @param cookieValue - Session cookie value
+ * @param timeout - Request timeout in milliseconds
+ * @returns CSRF token
  */
-async function getCsrfToken(cookieValue, timeout) {
-    const options = {
+async function getCsrfToken(cookieValue: string, timeout: number): Promise<string> {
+    const options: https.RequestOptions = {
         hostname: 'www.strava.com',
         path: '/dashboard',
         method: 'GET',
@@ -77,10 +84,10 @@ async function getCsrfToken(cookieValue, timeout) {
 
 /**
  * Transform group activity to standard activity format
- * @param {Object} activity - Group activity object
- * @returns {Object} Normalized activity object
+ * @param activity - Group activity object
+ * @returns Normalized activity object
  */
-function transformGroupActivity(activity) {
+function transformGroupActivity(activity: Record<string, any>): Activity {
     return {
         ...activity,
         activityName: activity.name,
@@ -92,32 +99,32 @@ function transformGroupActivity(activity) {
         kudosAndComments: {
             hasKudoed: activity.has_kudoed,
         },
-    };
+    } as Activity;
 }
 
 /**
  * Parse activities from dashboard HTML response
- * @param {string} htmlData - HTML response from dashboard
- * @returns {Array} Parsed activities
+ * @param htmlData - HTML response from dashboard
+ * @returns Parsed activities
  */
-function parseActivitiesFromDashboard(htmlData) {
+function parseActivitiesFromDashboard(htmlData: string): Activity[] {
     const reactPropsMatches = [...htmlData.matchAll(/data-react-props='([^']+)'/g)].map((match) => match[1]);
 
-    let activities = [];
+    let activities: Activity[] = [];
 
     reactPropsMatches.forEach((match) => {
         try {
             const reactProps = JSON.parse(decode(match));
             const entries = reactProps?.appContext?.feedProps?.preFetchedEntries || [];
 
-            entries.forEach((entry) => {
-                console.log(entry.activity)
+            entries.forEach((entry: any) => {
+                console.log(entry.activity);
                 if (entry.entity === 'Activity') activities.push(entry.activity);
                 else if (entry.entity === 'GroupActivity') activities.push(...entry.rowData.activities.map(transformGroupActivity));
             });
         } catch (parseError) {
             // Skip malformed JSON, continue processing
-            console.warn('Failed to parse react props:', parseError.message);
+            console.warn('Failed to parse react props:', parseError instanceof Error ? parseError.message : String(parseError));
         }
     });
 
@@ -136,7 +143,12 @@ function parseActivitiesFromDashboard(htmlData) {
  * Strava API client for authentication and data fetching
  */
 export class StravaClient {
-    constructor(sessionCookie, options = {}) {
+    private sessionCookie: string;
+    private timeout: number;
+    private cookieValue: string;
+    csrfToken: string | null;
+
+    constructor(sessionCookie: string, options: StravaClientOptions = {}) {
         this.sessionCookie = sessionCookie;
         this.timeout = options.timeout || 30000; // 30 second timeout
         this.cookieValue = `_strava4_session=${sessionCookie}`;
@@ -145,22 +157,21 @@ export class StravaClient {
 
     /**
      * Initialize the client by fetching the CSRF token
-     * @returns {Promise<void>}
      */
-    async initialize() {
+    async initialize(): Promise<void> {
         this.csrfToken = await getCsrfToken(this.cookieValue, this.timeout);
     }
 
     /**
      * Get activities from Strava dashboard
-     * @param {number} myAthleteID - User's athlete ID
-     * @param {number} [numEntries=60] - Number of entries to fetch
-     * @returns {Promise<Array>} Array of activities
+     * @param myAthleteID - User's athlete ID
+     * @param numEntries - Number of entries to fetch
+     * @returns Array of activities
      */
-    async getActivitiesViaDashboard(myAthleteID, numEntries = 60) {
+    async getActivitiesViaDashboard(myAthleteID: number, numEntries = 60): Promise<Activity[]> {
         if (!this.csrfToken) throw new Error('Client not initialized. Call initialize() first.');
 
-        const options = {
+        const options: https.RequestOptions = {
             hostname: 'www.strava.com',
             path: `/dashboard?num_entries=${numEntries}`,
             method: 'GET',
@@ -176,13 +187,13 @@ export class StravaClient {
 
     /**
      * Send kudos to an activity
-     * @param {string} activityId - Activity ID
-     * @returns {Promise<string>} Response data
+     * @param activityId - Activity ID
+     * @returns Response data
      */
-    async sendKudos(activityId) {
+    async sendKudos(activityId: string | number): Promise<string> {
         if (!this.csrfToken) throw new Error('Client not initialized. Call initialize() first.');
 
-        const options = {
+        const options: https.RequestOptions = {
             hostname: 'www.strava.com',
             path: `/feed/activity/${activityId}/kudo`,
             method: 'POST',

@@ -1,14 +1,15 @@
 /**
  * Command-line interface utilities
  */
+import type { CliOptions } from './types.js';
 
 /**
  * Parse command line arguments
- * @param {string[]} args - Command line arguments (process.argv)
- * @returns {Object} Parsed options
+ * @param args - Command line arguments (process.argv)
+ * @returns Parsed options
  */
-export function parseArgs(args = process.argv) {
-    const options = {
+export function parseArgs(args: string[] = process.argv): CliOptions {
+    const options: CliOptions = {
         dryRun: false,
         verbose: false,
         help: false,
@@ -44,11 +45,11 @@ export function parseArgs(args = process.argv) {
 /**
  * Display help information
  */
-export function showHelp() {
+export function showHelp(): void {
     console.log(`
 Strava Kudos Automation Tool
 
-Usage: node main.js [options]
+Usage: node dist/main.js [options]
 
 Options:
   -d, --dry-run      Show what would be done without actually sending kudos
@@ -56,8 +57,8 @@ Options:
   -h, --help         Show this help message
 
 Examples:
-  node main.js --dry-run --verbose    # Preview what would happen
-  node main.js                        # Send kudos to all qualifying activities
+  node dist/main.js --dry-run --verbose    # Preview what would happen
+  node dist/main.js                        # Send kudos to all qualifying activities
 
 Configuration:
   Place your configuration in config.json, config.yaml, or config.yml
@@ -67,9 +68,8 @@ Configuration:
 
 /**
  * Sleep for specified duration
- * @param {number} ms - Milliseconds to sleep
- * @returns {Promise<void>}
+ * @param ms - Milliseconds to sleep
  */
-export function sleep(ms) {
+export function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -8,7 +8,9 @@ export const LogLevel = {
     WARN: 'warn',
     INFO: 'info',
     DEBUG: 'debug',
-};
+} as const;
+
+export type LogLevelValue = (typeof LogLevel)[keyof typeof LogLevel];
 
 // Create Winston logger instance
 const winstonLogger = winston.createLogger({
@@ -16,7 +18,8 @@ const winstonLogger = winston.createLogger({
     format: winston.format.combine(
         winston.format.timestamp(),
         winston.format.colorize(),
-        winston.format.printf(({ timestamp, level, message, ...meta }) => {
+        winston.format.printf((info: winston.Logform.TransformableInfo) => {
+            const { timestamp, level, message, ...meta } = info;
             const metaStr = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : '';
             return `${timestamp} [${level}] ${message} ${metaStr}`.trim();
         })
@@ -31,15 +34,17 @@ const winstonLogger = winston.createLogger({
 });
 
 class Logger {
+    private winston: winston.Logger;
+
     constructor() {
         this.winston = winstonLogger;
     }
 
-    setLevel(level) {
+    setLevel(level: LogLevelValue): void {
         this.winston.level = level;
     }
 
-    error(message, ...args) {
+    error(message: string, ...args: unknown[]): void {
         if (args.length > 0) {
             // Format additional arguments naturally like console.log
             const formattedMessage = this.formatMessage(message, args);
@@ -49,7 +54,7 @@ class Logger {
         }
     }
 
-    warn(message, ...args) {
+    warn(message: string, ...args: unknown[]): void {
         if (args.length > 0) {
             const formattedMessage = this.formatMessage(message, args);
             this.winston.warn(formattedMessage);
@@ -58,7 +63,7 @@ class Logger {
         }
     }
 
-    info(message, ...args) {
+    info(message: string, ...args: unknown[]): void {
         if (args.length > 0) {
             const formattedMessage = this.formatMessage(message, args);
             this.winston.info(formattedMessage);
@@ -67,7 +72,7 @@ class Logger {
         }
     }
 
-    debug(message, ...args) {
+    debug(message: string, ...args: unknown[]): void {
         if (args.length > 0) {
             const formattedMessage = this.formatMessage(message, args);
             this.winston.debug(formattedMessage);
@@ -78,11 +83,11 @@ class Logger {
 
     /**
      * Format message with additional arguments like console.log
-     * @param {string} message - Main message
-     * @param {Array} args - Additional arguments
-     * @returns {string} Formatted message
+     * @param message - Main message
+     * @param args - Additional arguments
+     * @returns Formatted message
      */
-    formatMessage(message, args) {
+    formatMessage(message: string, args: unknown[]): string {
         const formattedArgs = args
             .map((arg) => {
                 if (typeof arg === 'object' && arg !== null) {
@@ -97,38 +102,38 @@ class Logger {
 
     /**
      * Log session information with redacted sensitive data
-     * @param {string} sessionCookie - Session cookie to redact
+     * @param sessionCookie - Session cookie to redact
      */
-    logSession(sessionCookie) {
+    logSession(sessionCookie: string): void {
         const redacted = sessionCookie.length > 8 ? `${sessionCookie.substring(0, 8)}...` : '***REDACTED***';
         this.debug(`Strava Session: ${redacted}`);
     }
 
     /**
      * Log CSRF token with partial redaction
-     * @param {string} csrfToken - CSRF token to log
+     * @param csrfToken - CSRF token to log
      */
-    logCsrfToken(csrfToken) {
+    logCsrfToken(csrfToken: string): void {
         const redacted = csrfToken.length > 8 ? `${csrfToken.substring(0, 8)}...` : '***REDACTED***';
         this.debug(`CSRF Token: ${redacted}`);
     }
 
     /**
      * Log activity processing summary
-     * @param {number} total - Total activities found
-     * @param {number} filtered - Activities that will receive kudos
-     * @param {boolean} dryRun - Whether this is a dry run
+     * @param total - Total activities found
+     * @param filtered - Activities that will receive kudos
+     * @param dryRun - Whether this is a dry run
      */
-    logSummary(total, filtered, dryRun = false) {
+    logSummary(total: number, filtered: number, dryRun = false): void {
         const action = dryRun ? 'Would send' : 'Sending';
         this.info(`${action} kudos to ${filtered} out of ${total} activities`);
     }
 
     /**
      * Log script start/end with timestamps
-     * @param {boolean} isStart - True for start, false for end
+     * @param isStart - True for start, false for end
      */
-    logScriptBoundary(isStart) {
+    logScriptBoundary(isStart: boolean): void {
         const message = isStart ? 'SCRIPT START' : 'SCRIPT END';
         this.info(`***** ${message} *****`);
     }

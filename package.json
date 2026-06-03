@@ -1,14 +1,23 @@
 {
-  "name": "strava_kudos",
-  "version": "1.0.0",
-  "main": "main.js",
-  "type": "module",
-  "scripts": {
-    "start": "node main.js"
-  },
-  "dependencies": {
-    "html-entities": "^2.5.2",
-    "js-yaml": "^4.1.0",
-    "winston": "^3.11.0"
-  }
+    "name": "strava_kudos",
+    "version": "1.0.0",
+    "main": "dist/main.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/main.js",
+        "dev": "tsx src/main.ts",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "html-entities": "^2.5.2",
+        "js-yaml": "^4.1.0",
+        "winston": "^3.11.0"
+    },
+    "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^22.10.2",
+        "tsx": "^4.19.2",
+        "typescript": "^5.7.2"
+    }
 }
