@@ -21,6 +21,8 @@ export interface Config {
     athleteId: number;
     ignoreAthletes: (string | number)[];
     maxActivityAgeHours: number;
+    /** Run the Playwright login browser without a visible window. Defaults to true. */
+    headless: boolean;
     kudoRules: KudoRules;
 }
 
@@ -31,6 +33,7 @@ export interface RawConfig {
     athleteId: string | number;
     ignoreAthletes?: (string | number)[];
     maxActivityAgeHours?: number | null;
+    headless?: boolean;
     kudoRules?: {
         minDistance?: Record<string, number>;
         minTime?: Record<string, number>;

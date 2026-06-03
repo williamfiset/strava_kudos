@@ -1,6 +1,7 @@
 stravaEmail: "your-strava-email"
 stravaPassword: "your-strava-password"
 athleteId: "your-athlete-id"
+headless: true
 ignoreAthletes:
   - "athlete-id-1"
   - "athlete-id-2"

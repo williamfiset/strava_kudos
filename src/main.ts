@@ -27,7 +27,7 @@ async function main(): Promise<void> {
         // Log in via the browser to obtain a fresh session cookie
         logger.info('Logging in to Strava...');
         logger.debug(`Authenticating as ${config.stravaEmail}`);
-        const browser = new StravaBrowser({ headless: true });
+        const browser = new StravaBrowser({ headless: config.headless });
         const sessionCookie = await browser.login(config.stravaEmail, config.stravaPassword);
         logger.info('Login successful - obtained session cookie');
         logger.logSession(sessionCookie);

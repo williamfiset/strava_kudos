@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { Config, RawConfig } from './types.js';
 
 const DEFAULT_MAX_ACTIVITY_AGE_HOURS = 24;
+const DEFAULT_HEADLESS = true;
 
 /**
  * Loads and validates configuration from config files
@@ -81,6 +82,9 @@ function validateConfig(config: unknown): RawConfig {
         if (!Number.isFinite(v) || v < 0) throw new Error("'maxActivityAgeHours' must be a non-negative number if provided");
     }
 
+    // Validate headless
+    if (c.headless !== undefined && typeof c.headless !== 'boolean') throw new Error("'headless' must be a boolean if provided");
+
     // Validate kudoRules structure if present
     if (c.kudoRules) {
         const { kudoRules } = c;
@@ -105,6 +109,7 @@ function normalizeConfig(config: RawConfig): Config {
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
         maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,
+        headless: config.headless ?? DEFAULT_HEADLESS,
         kudoRules: {
             minDistance: config.kudoRules?.minDistance || {},
             minTime: config.kudoRules?.minTime || {},

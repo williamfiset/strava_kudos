@@ -59,7 +59,7 @@ export class StravaBrowser {
         logger.debug(`Launching Firefox (headless=${this.headless})`);
         const browser = await firefox.launch({
             headless: this.headless,
-            slowMo: 500, // milliseconds
+            slowMo: 750, // milliseconds
          });
 
         try {
