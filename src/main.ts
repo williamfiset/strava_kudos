@@ -2,6 +2,7 @@ import { loadAndValidateConfig } from './config.js';
 import { StravaClient } from './stravaClient.js';
 import { filterActivities } from './filters.js';
 import { logger, LogLevel } from './logger.js';
+import { StravaBrowser } from './browser.js'
 import { parseArgs, showHelp, sleep } from './cli.js';
 import { loadAthleteState, saveAthleteState, recordAction } from './athleteState.js';
 import type { Activity, AthleteState } from './types.js';
@@ -23,10 +24,17 @@ async function main(): Promise<void> {
 
         const config = await loadAndValidateConfig();
 
-        // Initialize Strava client
-        const stravaClient = new StravaClient(config.stravaSessionCookie);
+        // Log in via the browser to obtain a fresh session cookie
+        logger.info('Logging in to Strava...');
+        logger.debug(`Authenticating as ${config.stravaEmail}`);
+        const browser = new StravaBrowser({ headless: true });
+        const sessionCookie = await browser.login(config.stravaEmail, config.stravaPassword);
+        logger.info('Login successful - obtained session cookie');
+        logger.logSession(sessionCookie);
+
+        // Initialize Strava client with the freshly obtained cookie
+        const stravaClient = new StravaClient(sessionCookie);
         await stravaClient.initialize();
-        logger.logSession(config.stravaSessionCookie);
         logger.logCsrfToken(stravaClient.csrfToken!);
 
         // Fetch activities

@@ -9,15 +9,16 @@
         "dev": "tsx src/main.ts",
         "typecheck": "tsc --noEmit"
     },
-    "dependencies": {
-        "html-entities": "^2.5.2",
-        "js-yaml": "^4.1.0",
-        "winston": "^3.11.0"
-    },
     "devDependencies": {
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^22.10.2",
         "tsx": "^4.19.2",
         "typescript": "^5.7.2"
+    },
+    "dependencies": {
+        "html-entities": "^2.6.0",
+        "js-yaml": "^4.2.0",
+        "playwright": "^1.60.0",
+        "winston": "^3.19.0"
     }
 }

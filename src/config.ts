@@ -65,7 +65,8 @@ function validateConfig(config: unknown): RawConfig {
 
     const c = config as RawConfig;
 
-    if (!c.stravaSessionCookie || typeof c.stravaSessionCookie !== 'string') throw new Error("'stravaSessionCookie' is missing or not a string in config");
+    if (!c.stravaEmail || typeof c.stravaEmail !== 'string') throw new Error("'stravaEmail' is missing or not a string in config");
+    if (!c.stravaPassword || typeof c.stravaPassword !== 'string') throw new Error("'stravaPassword' is missing or not a string in config");
     if (!c.athleteId) throw new Error("'athleteId' is missing in config");
 
     // Validate athleteId can be converted to number
@@ -99,7 +100,8 @@ function validateConfig(config: unknown): RawConfig {
  */
 function normalizeConfig(config: RawConfig): Config {
     return {
-        stravaSessionCookie: config.stravaSessionCookie,
+        stravaEmail: config.stravaEmail,
+        stravaPassword: config.stravaPassword,
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
         maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,
