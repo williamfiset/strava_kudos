@@ -7,6 +7,7 @@ ignoreAthletes:
   - "athlete-id-2"
   - "athlete-id-3"
 maxActivityAgeHours: 24
+kudosCooldownHours: 36
 kudoRules:
   minDistance:
     GroupActivity: 5

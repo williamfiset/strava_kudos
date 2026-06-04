@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import type { Config, RawConfig } from './types.js';
 
 const DEFAULT_MAX_ACTIVITY_AGE_HOURS = 24;
+const DEFAULT_KUDOS_COOLDOWN_HOURS = 36;
 const DEFAULT_HEADLESS = true;
 
 /**
@@ -82,6 +83,12 @@ function validateConfig(config: unknown): RawConfig {
         if (!Number.isFinite(v) || v < 0) throw new Error("'maxActivityAgeHours' must be a non-negative number if provided");
     }
 
+    // Validate kudosCooldownHours
+    if (c.kudosCooldownHours !== undefined && c.kudosCooldownHours !== null) {
+        const v = Number(c.kudosCooldownHours);
+        if (!Number.isFinite(v) || v < 0) throw new Error("'kudosCooldownHours' must be a non-negative number if provided");
+    }
+
     // Validate headless
     if (c.headless !== undefined && typeof c.headless !== 'boolean') throw new Error("'headless' must be a boolean if provided");
 
@@ -109,6 +116,7 @@ function normalizeConfig(config: RawConfig): Config {
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
         maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,
+        kudosCooldownHours: config.kudosCooldownHours ?? DEFAULT_KUDOS_COOLDOWN_HOURS,
         headless: config.headless ?? DEFAULT_HEADLESS,
         kudoRules: {
             minDistance: config.kudoRules?.minDistance || {},

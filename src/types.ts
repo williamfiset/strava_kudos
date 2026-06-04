@@ -21,6 +21,8 @@ export interface Config {
     athleteId: number;
     ignoreAthletes: (string | number)[];
     maxActivityAgeHours: number;
+    /** Minimum hours between kudos to the same athlete. Defaults to 36. */
+    kudosCooldownHours: number;
     /** Run the Playwright login browser without a visible window. Defaults to true. */
     headless: boolean;
     kudoRules: KudoRules;
@@ -33,6 +35,7 @@ export interface RawConfig {
     athleteId: string | number;
     ignoreAthletes?: (string | number)[];
     maxActivityAgeHours?: number | null;
+    kudosCooldownHours?: number | null;
     headless?: boolean;
     kudoRules?: {
         minDistance?: Record<string, number>;

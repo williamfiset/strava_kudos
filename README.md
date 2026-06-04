@@ -7,6 +7,7 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 ## ✨ Features
 
 - **Smart Activity Filtering**: Configure rules based on activity type, distance, time, and name patterns
+- **Per-Athlete Cooldown**: Avoids spamming the same athlete — only gives kudos if more than 36 hours have passed since their last one (state persisted in `athleteState.json`)
 - **Dry Run Mode**: Preview actions without actually sending kudos
 - **Professional Logging**: Winston-based logging with timestamps, colors, and automatic sensitive data redaction
 - **Multiple Config Formats**: Supports both JSON and YAML configuration files
@@ -31,23 +32,19 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
    cp config.yaml.example config.yaml
    ```
 
-3. **Build (compile TypeScript)**
+3. **Test with a Dry Run**
+   `npm run dev` runs the TypeScript sources directly (no build step needed). Use `--dry-run` to preview what *would* happen without sending any kudos, and `--verbose` to see the filtering decisions:
    ```bash
-   npm run build
-   ```
-
-4. **Test with Dry Run**
-   ```bash
-   node dist/main.js --dry-run --verbose
-   # or, without building, run the TypeScript directly:
    npm run dev -- --dry-run --verbose
    ```
 
-5. **Run for Real**
+4. **Run for Real**
+   Once the dry run looks right, drop `--dry-run` to actually send kudos:
    ```bash
-   npm start
-   # equivalent to: node dist/main.js
+   npm run dev -- --verbose
    ```
+
+   > **Tip:** `--dry-run` never modifies `athleteState.json`, so you can preview freely. For a compiled production run instead, use `npm run build` followed by `npm start` (equivalent to `node dist/main.js`).
 
 ## ⚙️ Configuration
 
@@ -61,6 +58,7 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 
 - **`ignoreAthletes`**: Array of athlete IDs to never give kudos to
 - **`maxActivityAgeHours`**: Skip activities older than this many hours. Defaults to `24`. Set to `0` to disable.
+- **`kudosCooldownHours`**: Minimum hours between kudos to the same athlete. Defaults to `36`. Set to `0` to disable the cooldown.
 - **`headless`**: Run the Playwright login browser without a visible window. Defaults to `true`. Set to `false` to watch the login (and manually solve a reCAPTCHA if one appears).
 - **`kudoRules`**: Object containing filtering rules:
   - **`minDistance`**: Minimum distance by activity type (e.g., `{"Run": 5, "Ride": 20}`)
@@ -84,6 +82,7 @@ The app looks for config files in this order:
   "stravaPassword": "your-strava-password",
   "athleteId": "12345678",
   "ignoreAthletes": ["87654321", "11223344"],
+  "kudosCooldownHours": 36,
   "kudoRules": {
     "minDistance": {
       "Run": 5,
@@ -113,6 +112,7 @@ athleteId: "12345678"
 ignoreAthletes:
   - "87654321" # Max Mustermann
   - "11223344" # Sarah Mustermann
+kudosCooldownHours: 36
 kudoRules:
   minDistance:
     Run: 5
@@ -127,6 +127,29 @@ kudoRules:
     - "birthday.*run"
     - "charity"
 ```
+
+## ⏳ Per-Athlete Cooldown & State
+
+To avoid repeatedly kudoing the same person, the app enforces a **per-athlete cooldown**: an athlete only receives a kudos if more than `kudosCooldownHours` (default **36**) have passed since the last one they got from you. Within a single run, an athlete with several qualifying activities receives at most one kudos (the earliest one). Activity names matching a `kudoRules.activityNames` whitelist pattern bypass the cooldown and always get kudos.
+
+The cooldown is configurable via the `kudosCooldownHours` field in your config file; set it to `0` to disable the cooldown entirely.
+
+The cooldown is tracked in **`athleteState.json`**, written to the project root after each real (non–dry-run) run:
+
+```json
+{
+  "12345678": {
+    "athleteName": "Jane Doe",
+    "lastActivityId": "18785405410",
+    "lastAction": "kudoed",
+    "lastSeenAt": "2026-06-04T09:17:30-07:00"
+  }
+}
+```
+
+- **`lastSeenAt`** is the timestamp of the last kudos, recorded in **US Pacific time** (with its UTC offset, e.g. `-07:00`/`-08:00`) for readability. The offset is preserved so the value is still parsed back to the exact instant — the cooldown comparison stays correct regardless of the machine's timezone or DST.
+- The file is created automatically; you don't need to manage it. Deleting it simply resets all cooldowns.
+- Dry runs (`--dry-run`) never modify `athleteState.json`.
 
 ## 🖥️ Command Line Options
 
@@ -283,12 +306,13 @@ strava_kudos/
 │   ├── main.ts               # Main application entry point
 │   ├── config.ts             # Configuration loading and validation
 │   ├── stravaClient.ts       # Strava API client with timeout handling
-│   ├── filters.ts            # Activity filtering logic with debug logging
-│   ├── athleteState.ts       # Per-athlete alternation state persistence
+│   ├── filters.ts            # Activity filtering + per-athlete cooldown logic
+│   ├── athleteState.ts       # Per-athlete kudos-cooldown state persistence
 │   ├── logger.ts             # Winston-based logging with redaction
 │   ├── cli.ts                # Command-line interface parsing
 │   └── types.ts              # Shared type definitions
 ├── dist/                      # Compiled JavaScript (generated by `npm run build`)
+├── athleteState.json          # Per-athlete kudos timestamps (auto-generated at runtime)
 ├── tsconfig.json             # TypeScript compiler configuration
 ├── config.json.example       # Example JSON configuration
 ├── config.yaml.example       # Example YAML configuration
@@ -307,8 +331,8 @@ The application is written in **TypeScript** and follows a **modular ES module a
 - **`src/main.ts`**: Orchestrates the application flow and coordinates modules
 - **`src/config.ts`**: Handles configuration loading, validation, and normalization
 - **`src/stravaClient.ts`**: HTTP client with 30-second timeouts and error handling
-- **`src/filters.ts`**: Activity filtering with detailed debug logging and statistics
-- **`src/athleteState.ts`**: Loads/saves per-athlete alternation state
+- **`src/filters.ts`**: Activity filtering, statistics, and the 36-hour per-athlete cooldown, with detailed debug logging
+- **`src/athleteState.ts`**: Loads/saves per-athlete kudos-cooldown state (`athleteState.json`), timestamped in Pacific time
 - **`src/logger.ts`**: Winston-based logging with timestamp, colors, and sensitive data redaction
 - **`src/cli.ts`**: Command-line argument parsing and help system
 - **`src/types.ts`**: Shared interfaces (`Config`, `Activity`, `AthleteState`, …)

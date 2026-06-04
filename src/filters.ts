@@ -5,9 +5,6 @@ import { logger } from './logger.js';
 import { getHoursSinceLastKudos } from './athleteState.js';
 import type { Activity, ActivityStats, AthleteState, Config, KudoRules } from './types.js';
 
-/** Minimum hours that must pass after kudoing an athlete before kudoing them again. */
-const KUDOS_COOLDOWN_HOURS = 36;
-
 interface FilterOptions {
     dryRun?: boolean;
     verbose?: boolean;
@@ -51,19 +48,20 @@ export function filterActivities(activities: Activity[], config: Config, state: 
             return;
         }
 
-        // Whitelisted names bypass the cooldown.
+        // Whitelisted names bypass the cooldown. A cooldown of 0 disables it entirely.
         const whitelisted = matchesWhitelist(activityItem.activityName, config.kudoRules);
+        const cooldownEnabled = !whitelisted && config.kudosCooldownHours > 0;
         const athleteKey = String(activityItem.athlete.athleteId);
 
-        if (!whitelisted) {
+        if (cooldownEnabled) {
             if (kudoedThisRun.has(athleteKey)) {
                 logger.debug(`--- Cooldown: skipping (already kudoed this athlete in this run)`);
                 cooldownSkipped.push(activityItem);
                 return;
             }
             const hoursSinceKudos = getHoursSinceLastKudos(state, activityItem.athlete.athleteId);
-            if (hoursSinceKudos !== null && hoursSinceKudos < KUDOS_COOLDOWN_HOURS) {
-                logger.debug(`--- Cooldown: skipping (last kudos ${hoursSinceKudos.toFixed(1)}h ago < ${KUDOS_COOLDOWN_HOURS}h)`);
+            if (hoursSinceKudos !== null && hoursSinceKudos < config.kudosCooldownHours) {
+                logger.debug(`--- Cooldown: skipping (last kudos ${hoursSinceKudos.toFixed(1)}h ago < ${config.kudosCooldownHours}h)`);
                 cooldownSkipped.push(activityItem);
                 return;
             }
@@ -72,7 +70,7 @@ export function filterActivities(activities: Activity[], config: Config, state: 
         const actionText = dryRun ? 'Would give kudos' : 'Will give kudos';
         logger.debug(`+++ ${actionText}${whitelisted ? ' (whitelist override)' : ''}`);
         toKudo.push(activityItem);
-        if (!whitelisted) kudoedThisRun.add(athleteKey);
+        if (cooldownEnabled) kudoedThisRun.add(athleteKey);
     });
 
     return { toKudo, cooldownSkipped };
