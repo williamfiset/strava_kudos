@@ -2,8 +2,11 @@
  * Activity filtering and validation utilities
  */
 import { logger } from './logger.js';
-import { getLastAction } from './athleteState.js';
+import { getHoursSinceLastKudos } from './athleteState.js';
 import type { Activity, ActivityStats, AthleteState, Config, KudoRules } from './types.js';
+
+/** Minimum hours that must pass after kudoing an athlete before kudoing them again. */
+const KUDOS_COOLDOWN_HOURS = 36;
 
 interface FilterOptions {
     dryRun?: boolean;
@@ -12,24 +15,29 @@ interface FilterOptions {
 
 interface FilterResult {
     toKudo: Activity[];
-    alternationSkipped: Activity[];
+    cooldownSkipped: Activity[];
 }
 
 /**
- * Filter activities based on configuration rules and per-athlete alternation state.
- * Processes activities oldest-first (by id) so that state reflects the newest decision.
+ * Filter activities based on configuration rules and a per-athlete kudos cooldown.
+ * Processes activities oldest-first (by id) so that, within a single run, an
+ * athlete with multiple recent activities only receives one kudos.
  *
  * @param activities - Array of activities to filter
  * @param config - Configuration object with filtering rules
- * @param state - Per-athlete state used for alternation
+ * @param state - Per-athlete state holding the last kudos timestamp
  * @param options - Filtering options
  */
 export function filterActivities(activities: Activity[], config: Config, state: AthleteState, options: FilterOptions = {}): FilterResult {
     const { dryRun = false } = options;
     const toKudo: Activity[] = [];
-    const alternationSkipped: Activity[] = [];
+    const cooldownSkipped: Activity[] = [];
 
-    // Sort oldest first so alternation decisions cascade in chronological order.
+    // Athletes we've already decided to kudos in this run, so we don't kudos
+    // multiple of their activities at once (state isn't persisted until later).
+    const kudoedThisRun = new Set<string>();
+
+    // Sort oldest first so the earliest activity wins the single per-run kudos.
     const sorted = [...activities].sort((a, b) => Number(a.id) - Number(b.id));
 
     sorted.forEach((activityItem) => {
@@ -43,14 +51,20 @@ export function filterActivities(activities: Activity[], config: Config, state: 
             return;
         }
 
-        // Whitelisted names bypass the every-other rule.
+        // Whitelisted names bypass the cooldown.
         const whitelisted = matchesWhitelist(activityItem.activityName, config.kudoRules);
+        const athleteKey = String(activityItem.athlete.athleteId);
 
         if (!whitelisted) {
-            const lastAction = getLastAction(state, activityItem.athlete.athleteId);
-            if (lastAction === 'kudoed') {
-                logger.debug(`--- Alternation: skipping (last action for this athlete was 'kudoed')`);
-                alternationSkipped.push(activityItem);
+            if (kudoedThisRun.has(athleteKey)) {
+                logger.debug(`--- Cooldown: skipping (already kudoed this athlete in this run)`);
+                cooldownSkipped.push(activityItem);
+                return;
+            }
+            const hoursSinceKudos = getHoursSinceLastKudos(state, activityItem.athlete.athleteId);
+            if (hoursSinceKudos !== null && hoursSinceKudos < KUDOS_COOLDOWN_HOURS) {
+                logger.debug(`--- Cooldown: skipping (last kudos ${hoursSinceKudos.toFixed(1)}h ago < ${KUDOS_COOLDOWN_HOURS}h)`);
+                cooldownSkipped.push(activityItem);
                 return;
             }
         }
@@ -58,9 +72,10 @@ export function filterActivities(activities: Activity[], config: Config, state: 
         const actionText = dryRun ? 'Would give kudos' : 'Will give kudos';
         logger.debug(`+++ ${actionText}${whitelisted ? ' (whitelist override)' : ''}`);
         toKudo.push(activityItem);
+        if (!whitelisted) kudoedThisRun.add(athleteKey);
     });
 
-    return { toKudo, alternationSkipped };
+    return { toKudo, cooldownSkipped };
 }
 
 /**

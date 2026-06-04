@@ -74,17 +74,17 @@ export interface Activity {
 export type ActivityStats = Record<string, string>;
 
 /** Action recorded for an athlete on a given run. */
-export type ActionType = 'kudoed' | 'skipped';
+export type ActionType = 'kudoed';
 
-/** Persisted per-athlete alternation state entry. */
+/** Persisted per-athlete state entry tracking the most recent kudos. */
 export interface AthleteEntry {
     /** Display name of the athlete (for human readability). */
     athleteName?: string;
-    /** ID of the most recently processed activity. */
+    /** ID of the most recently kudoed activity. */
     lastActivityId: string;
     /** What we did with that activity. */
     lastAction: ActionType;
-    /** ISO timestamp of the decision. */
+    /** ISO timestamp of the kudos in Pacific time (e.g. "2026-06-04T10:30:00-07:00"), used to enforce the per-athlete cooldown. */
     lastSeenAt: string;
 }
 

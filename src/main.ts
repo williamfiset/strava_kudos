@@ -45,17 +45,16 @@ async function main(): Promise<void> {
         const athleteState = await loadAthleteState();
 
         // Filter activities based on rules + alternation
-        const { toKudo, alternationSkipped } = filterActivities(activities, config, athleteState, {
+        const { toKudo, cooldownSkipped } = filterActivities(activities, config, athleteState, {
             dryRun: options.dryRun,
             verbose: options.verbose,
         });
         logger.logSummary(activities.length, toKudo.length, options.dryRun);
 
-        if (alternationSkipped.length > 0) {
-            logger.info(`Alternation: skipping ${alternationSkipped.length} activity/activities (every-other rule)`);
-            alternationSkipped.forEach((activity) => {
-                logger.info(`Skipping (alternation): ${activity.athlete.athleteName} - ${activity.activityName}`);
-                if (!options.dryRun) recordAction(athleteState, activity.athlete, activity.id, 'skipped');
+        if (cooldownSkipped.length > 0) {
+            logger.info(`Cooldown: skipping ${cooldownSkipped.length} activity/activities (kudoed within last 36h)`);
+            cooldownSkipped.forEach((activity) => {
+                logger.info(`Skipping (cooldown): ${activity.athlete.athleteName} - ${activity.activityName}`);
             });
         }
 

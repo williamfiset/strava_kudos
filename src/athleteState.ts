@@ -30,10 +30,15 @@ export async function saveAthleteState(state: AthleteState): Promise<void> {
 }
 
 /**
- * Get the last action recorded for an athlete.
+ * Get the number of hours since the last kudos was given to an athlete.
+ * Returns null if the athlete has never been kudoed or the timestamp is unparseable.
  */
-export function getLastAction(state: AthleteState, athleteId: string | number): ActionType | null {
-    return state[String(athleteId)]?.lastAction || null;
+export function getHoursSinceLastKudos(state: AthleteState, athleteId: string | number): number | null {
+    const entry = state[String(athleteId)];
+    if (!entry || entry.lastAction !== 'kudoed') return null;
+    const ts = new Date(entry.lastSeenAt).getTime();
+    if (Number.isNaN(ts)) return null;
+    return (Date.now() - ts) / (1000 * 60 * 60);
 }
 
 /**
@@ -44,6 +49,34 @@ export function recordAction(state: AthleteState, athlete: Athlete, activityId: 
         athleteName: athlete.athleteName,
         lastActivityId: String(activityId),
         lastAction: action,
-        lastSeenAt: new Date().toISOString(),
+        lastSeenAt: toPacificISOString(new Date()),
     };
+}
+
+/**
+ * Format a date as an ISO-8601 string in US Pacific time, including the
+ * UTC offset (e.g. "2026-06-04T10:30:00-07:00"). DST is handled automatically.
+ *
+ * Keeping the offset makes the value both human-readable in Pacific time and
+ * parseable by `new Date(...)`, so cooldown math stays correct.
+ */
+function toPacificISOString(date: Date): string {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+        timeZoneName: 'longOffset',
+    }).formatToParts(date);
+
+    const get = (type: Intl.DateTimeFormatPartTypes): string => parts.find((p) => p.type === type)?.value ?? '';
+
+    // `longOffset` yields e.g. "GMT-07:00"; strip the prefix to get "-07:00".
+    const offset = get('timeZoneName').replace('GMT', '') || '+00:00';
+
+    return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}${offset}`;
 }
