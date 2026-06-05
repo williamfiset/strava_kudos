@@ -32,13 +32,19 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
    cp config.yaml.example config.yaml
    ```
 
-3. **Test with a Dry Run**
+3. **Add Your Credentials**
+   Copy `.env.example` to `.env` and add your base64-encoded Strava email and password (see [Credentials](#credentials-env)):
+   ```bash
+   cp .env.example .env
+   ```
+
+5. **Test with a Dry Run**
    `npm run dev` runs the TypeScript sources directly (no build step needed). Use `--dry-run` to preview what *would* happen without sending any kudos, and `--verbose` to see the filtering decisions:
    ```bash
    npm run dev -- --dry-run --verbose
    ```
 
-4. **Run for Real**
+6. **Run for Real**
    Once the dry run looks right, drop `--dry-run` to actually send kudos:
    ```bash
    npm run dev -- --verbose
@@ -48,10 +54,32 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 
 ## ⚙️ Configuration
 
+### Credentials (`.env`)
+
+Your Strava credentials live in a `.env` file (gitignored), **not** in the config file. The values are stored **base64-encoded** — light obfuscation so they aren't sitting in plain text; this is **not** real encryption.
+
+Copy `.env.example` to `.env` and fill in the base64-encoded values:
+
+```bash
+cp .env.example .env
+```
+
+Encode each value with:
+
+```bash
+printf '%s' 'you@example.com' | base64        # -> STRAVA_EMAIL
+printf '%s' 'your-strava-password' | base64   # -> STRAVA_PASSWORD
+```
+
+```dotenv
+STRAVA_EMAIL=eW91QGV4YW1wbGUuY29t
+STRAVA_PASSWORD=eW91ci1zdHJhdmEtcGFzc3dvcmQ=
+```
+
+The app logs in with a real browser (Playwright/Firefox) using these credentials and obtains a session cookie automatically.
+
 ### Required Fields
 
-- **`stravaEmail`**: Your Strava account email. The app logs in with a real browser (Playwright/Firefox) and obtains a session cookie automatically.
-- **`stravaPassword`**: Your Strava account password.
 - **`athleteId`**: Your Strava athlete ID (number)
 
 ### Optional Fields
@@ -78,8 +106,6 @@ The app looks for config files in this order:
 
 ```json
 {
-  "stravaEmail": "you@example.com",
-  "stravaPassword": "your-strava-password",
   "athleteId": "12345678",
   "ignoreAthletes": ["87654321", "11223344"],
   "kudosCooldownHours": 36,
@@ -106,8 +132,6 @@ The app looks for config files in this order:
 ### Example YAML Configuration
 
 ```yaml
-stravaEmail: "you@example.com"
-stravaPassword: "your-strava-password"
 athleteId: "12345678"
 ignoreAthletes:
   - "87654321" # Max Mustermann
@@ -186,7 +210,7 @@ npm run dev -- --dry-run --verbose # runs the TypeScript sources directly via ts
 
 ### Prerequisites
 
-Before using Docker, ensure you have a configuration file:
+Before using Docker, ensure you have a configuration file and a `.env` file with your credentials:
 
 ```bash
 # Create config.yaml from example (recommended)
@@ -196,6 +220,10 @@ cp config.yaml.example config.yaml
 # OR create config.json from example
 cp config.json.example config.json
 # Edit config.json with your actual values
+
+# Create .env with your base64-encoded Strava credentials
+cp .env.example .env
+# Edit .env (see the Credentials section above)
 ```
 
 ### Using Docker Compose
@@ -228,17 +256,17 @@ docker compose down
 # Pull pre-built image
 docker pull ghcr.io/aexel90/strava_kudos:main
 
-# Run with config.yaml (default mount location)
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudos:main
+# Run with config.yaml (default mount location); mount .env for credentials
+docker run -v $(pwd)/config.yaml:/app/config.yaml:ro -v $(pwd)/.env:/app/.env:ro ghcr.io/aexel90/strava_kudos:main
 
 # Run with config.json
-docker run -v $(pwd)/config.json:/app/config.json:ro ghcr.io/aexel90/strava_kudos:main
+docker run -v $(pwd)/config.json:/app/config.json:ro -v $(pwd)/.env:/app/.env:ro ghcr.io/aexel90/strava_kudos:main
 
 # Build local image
 docker build -t strava-kudos-local .
 
 # Run locally built image
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro strava-kudos-local
+docker run -v $(pwd)/config.yaml:/app/config.yaml:ro -v $(pwd)/.env:/app/.env:ro strava-kudos-local
 
 # Run with dry-run mode (override default verbose flag)
 docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudos:main node main.js --dry-run --verbose
@@ -356,21 +384,24 @@ The application is written in **TypeScript** and follows a **modular ES module a
 1. **"No configuration file found"**
    - Ensure you have `config.json`, `config.yaml`, or `config.yml` in the project root
 
-2. **"Login did not complete"**
-   - Double-check `stravaEmail` / `stravaPassword` in your config
+2. **"No `.env` file found" / credential errors**
+   - Copy `.env.example` to `.env` and add your base64-encoded `STRAVA_EMAIL` / `STRAVA_PASSWORD`
+
+3. **"Login did not complete"**
+   - Double-check your `STRAVA_EMAIL` / `STRAVA_PASSWORD` in `.env` (and that they're correctly base64-encoded)
    - Strava may present a reCAPTCHA challenge; construct the browser with `{ headless: false }` to solve it manually in a visible window
    - Run with `-v` / `--verbose` to see each login step
 
-3. **"No activities found"**
+4. **"No activities found"**
    - Ensure you're following accounts with recent activities
 
-4. **Network timeouts**
+5. **Network timeouts**
    - The app includes 30-second timeouts by default
    - Check your internet connection
 
 ### Authentication
 
-The app logs in to Strava with your `stravaEmail` / `stravaPassword` using a real Firefox browser (via Playwright) and uses the resulting `_strava4_session` cookie automatically — no need to copy a cookie from your browser. The Firefox binary must be installed once:
+The app logs in to Strava with your `STRAVA_EMAIL` / `STRAVA_PASSWORD` (from `.env`) using a real Firefox browser (via Playwright) and uses the resulting `_strava4_session` cookie automatically — no need to copy a cookie from your browser. The Firefox binary must be installed once:
 
 ```bash
 npx playwright install firefox

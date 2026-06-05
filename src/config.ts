@@ -1,21 +1,57 @@
 import { readFile, access } from 'fs/promises';
 import { constants as fsConstants } from 'fs';
+import { existsSync } from 'fs';
 import { logger } from './logger.js';
 import yaml from 'js-yaml';
-import type { Config, RawConfig } from './types.js';
+import type { Config, Credentials, RawConfig } from './types.js';
 
 const DEFAULT_MAX_ACTIVITY_AGE_HOURS = 24;
 const DEFAULT_KUDOS_COOLDOWN_HOURS = 36;
 const DEFAULT_HEADLESS = true;
+
+const ENV_FILE = '.env';
 
 /**
  * Loads and validates configuration from config files
  * @returns Validated configuration object
  */
 export async function loadAndValidateConfig(): Promise<Config> {
+    const credentials = loadCredentials();
     const raw = await loadConfig();
     const validated = validateConfig(raw);
-    return normalizeConfig(validated);
+    return normalizeConfig(validated, credentials);
+}
+
+/**
+ * Loads Strava credentials from the .env file. Values are stored base64-encoded
+ * (light obfuscation so they're not in plain text) and decoded here.
+ * @returns Decoded Strava email and password
+ */
+function loadCredentials(): Credentials {
+    if (!existsSync(ENV_FILE)) throw new Error(`No ${ENV_FILE} file found. Copy .env.example to ${ENV_FILE} and add your base64-encoded Strava credentials.`);
+
+    // Node's built-in .env parser; populates process.env from the file.
+    process.loadEnvFile(ENV_FILE);
+
+    const stravaEmail = decodeCredential('STRAVA_EMAIL', process.env.STRAVA_EMAIL);
+    const stravaPassword = decodeCredential('STRAVA_PASSWORD', process.env.STRAVA_PASSWORD);
+
+    return { stravaEmail, stravaPassword };
+}
+
+/**
+ * Base64-decodes a credential value read from the environment.
+ * @param name - Environment variable name (for error messages)
+ * @param value - Raw base64-encoded value
+ * @returns The decoded plain-text credential
+ */
+function decodeCredential(name: string, value: string | undefined): string {
+    if (!value) throw new Error(`'${name}' is missing from ${ENV_FILE}`);
+
+    const decoded = Buffer.from(value, 'base64').toString('utf8');
+    if (!decoded) throw new Error(`'${name}' in ${ENV_FILE} could not be decoded; expected a base64-encoded value`);
+
+    return decoded;
 }
 
 /**
@@ -67,8 +103,6 @@ function validateConfig(config: unknown): RawConfig {
 
     const c = config as RawConfig;
 
-    if (!c.stravaEmail || typeof c.stravaEmail !== 'string') throw new Error("'stravaEmail' is missing or not a string in config");
-    if (!c.stravaPassword || typeof c.stravaPassword !== 'string') throw new Error("'stravaPassword' is missing or not a string in config");
     if (!c.athleteId) throw new Error("'athleteId' is missing in config");
 
     // Validate athleteId can be converted to number
@@ -107,12 +141,13 @@ function validateConfig(config: unknown): RawConfig {
 /**
  * Normalizes configuration values and provides defaults
  * @param config - Raw configuration object
+ * @param credentials - Strava credentials loaded from the .env file
  * @returns Normalized configuration
  */
-function normalizeConfig(config: RawConfig): Config {
+function normalizeConfig(config: RawConfig, credentials: Credentials): Config {
     return {
-        stravaEmail: config.stravaEmail,
-        stravaPassword: config.stravaPassword,
+        stravaEmail: credentials.stravaEmail,
+        stravaPassword: credentials.stravaPassword,
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
         maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,

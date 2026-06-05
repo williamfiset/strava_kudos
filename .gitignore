@@ -5,3 +5,4 @@
 config.json
 config.yaml
 athleteState.json
+.env

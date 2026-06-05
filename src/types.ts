@@ -12,6 +12,14 @@ export interface KudoRules {
     activityNames: string[];
 }
 
+/** Strava login credentials, decoded from the .env file. */
+export interface Credentials {
+    /** Strava account email. */
+    stravaEmail: string;
+    /** Strava account password. */
+    stravaPassword: string;
+}
+
 /** Fully normalized configuration consumed by the application. */
 export interface Config {
     /** Strava account email; used to log in via the browser and obtain a session cookie. */
@@ -28,10 +36,11 @@ export interface Config {
     kudoRules: KudoRules;
 }
 
-/** Configuration as read from disk, before normalization/defaults. */
+/**
+ * Configuration as read from the config file, before normalization/defaults.
+ * Credentials live in the .env file (see {@link Credentials}), not here.
+ */
 export interface RawConfig {
-    stravaEmail: string;
-    stravaPassword: string;
     athleteId: string | number;
     ignoreAthletes?: (string | number)[];
     maxActivityAgeHours?: number | null;

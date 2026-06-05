@@ -5,6 +5,7 @@ services:
     restart: on-failure:2
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./.env:/app/.env:ro
   strava_kudos_local:
     image: strava_kudos_local
     build: .
@@ -12,3 +13,4 @@ services:
     restart: on-failure:2
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./.env:/app/.env:ro
