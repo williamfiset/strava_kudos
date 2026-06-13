@@ -9,13 +9,9 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 - **Smart Activity Filtering**: Configure rules based on activity type, distance, time, and name patterns
 - **Per-Athlete Cooldown**: Avoids spamming the same athlete — only gives kudos if more than 36 hours have passed since their last one (state persisted in `athleteState.json`)
 - **Dry Run Mode**: Preview actions without actually sending kudos
-- **Professional Logging**: Winston-based logging with timestamps, colors, and automatic sensitive data redaction
 - **Multiple Config Formats**: Supports both JSON and YAML configuration files
-- **Modular Architecture**: Clean ES6 modules for easy maintenance and extension
 - **Docker Ready**: Optimized Dockerfile with multi-layer caching and dual Docker Compose setups
 - **Security First**: 30-second HTTP timeouts, cookie redaction, and read-only volume mounts
-- **Debug Logging**: Detailed verbose mode showing filtering decisions and statistics
-- **CLI Interface**: Simple command-line options with built-in help system
 
 ## 🚀 Quick Start
 
@@ -24,27 +20,27 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
    npm install
    ```
 
-2. **Create Configuration**
-   Copy and edit one of the example config files:
+2. **Create the Settings File**
+   This holds your filtering rules and options. Copy and edit one of the example config files:
    ```bash
    cp config.json.example config.json
    # OR
    cp config.yaml.example config.yaml
    ```
 
-3. **Add Your Credentials**
-   Copy `.env.example` to `.env` and add your base64-encoded Strava email and password (see [Credentials](#credentials-env)):
+3. **Create the Credentials File**
+   Your Strava login lives in a separate `.env` file. Copy `.env.example` to `.env` and add your base64-encoded Strava email and password (see [Credentials](#credentials-env)):
    ```bash
    cp .env.example .env
    ```
 
-5. **Test with a Dry Run**
+4. **Test with a Dry Run**
    `npm run dev` runs the TypeScript sources directly (no build step needed). Use `--dry-run` to preview what *would* happen without sending any kudos, and `--verbose` to see the filtering decisions:
    ```bash
    npm run dev -- --dry-run --verbose
    ```
 
-6. **Run for Real**
+5. **Run for Real**
    Once the dry run looks right, drop `--dry-run` to actually send kudos:
    ```bash
    npm run dev -- --verbose
@@ -53,6 +49,15 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
    > **Tip:** `--dry-run` never modifies `athleteState.json`, so you can preview freely. For a compiled production run instead, use `npm run build` followed by `npm start` (equivalent to `node dist/main.js`).
 
 ## ⚙️ Configuration
+
+This app uses **two separate configuration files**, each with a distinct job:
+
+| File | Purpose |
+|------|---------|
+| **`.env`** | Your Strava **credentials** (`STRAVA_EMAIL` / `STRAVA_PASSWORD`, base64-encoded) |
+| **`config.json` / `config.yaml`** | Your **behavior settings** (athlete ID, filtering rules, cooldown, etc.) |
+
+You need **both**: the `.env` file tells the app *who* to log in as, and the config file tells it *what* to do once logged in. Copy each from its example (`.env.example`, `config.json.example` / `config.yaml.example`) to get started.
 
 ### Credentials (`.env`)
 
@@ -78,11 +83,15 @@ STRAVA_PASSWORD=eW91ci1zdHJhdmEtcGFzc3dvcmQ=
 
 The app logs in with a real browser (Playwright/Firefox) using these credentials and obtains a session cookie automatically.
 
-### Required Fields
+### Settings (`config.json` / `config.yaml`)
+
+Everything below lives in your config file (JSON or YAML)
+
+#### Required Fields
 
 - **`athleteId`**: Your Strava athlete ID (number)
 
-### Optional Fields
+#### Optional Fields
 
 - **`ignoreAthletes`**: Array of athlete IDs to never give kudos to
 - **`maxActivityAgeHours`**: Skip activities older than this many hours. Defaults to `24`. Set to `0` to disable.
