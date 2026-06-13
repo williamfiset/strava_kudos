@@ -9,7 +9,7 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 - **Smart Activity Filtering**: Configure rules based on activity type, distance, time, and name patterns
 - **Per-Athlete Cooldown**: Avoids spamming the same athlete — only gives kudos if more than 36 hours have passed since their last one (state persisted in `athleteState.json`)
 - **Dry Run Mode**: Preview actions without actually sending kudos
-- **Multiple Config Formats**: Supports both JSON and YAML configuration files
+- **Simple Configuration**: Plain JSON config file, no extra tooling required
 - **Docker Ready**: Optimized Dockerfile with multi-layer caching and dual Docker Compose setups
 - **Security First**: 30-second HTTP timeouts, cookie redaction, and read-only volume mounts
 
@@ -21,11 +21,9 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
    ```
 
 2. **Create the Settings File**
-   This holds your filtering rules and options. Copy and edit one of the example config files:
+   This holds your filtering rules and options. Copy and edit the example config file:
    ```bash
    cp config.json.example config.json
-   # OR
-   cp config.yaml.example config.yaml
    ```
 
 3. **Create the Credentials File**
@@ -55,9 +53,9 @@ This app uses **two separate configuration files**, each with a distinct job:
 | File | Purpose |
 |------|---------|
 | **`.env`** | Your Strava **credentials** (`STRAVA_EMAIL` / `STRAVA_PASSWORD`, base64-encoded) |
-| **`config.json` / `config.yaml`** | Your **behavior settings** (athlete ID, filtering rules, cooldown, etc.) |
+| **`config.json`** | Your **behavior settings** (athlete ID, filtering rules, cooldown, etc.) |
 
-You need **both**: the `.env` file tells the app *who* to log in as, and the config file tells it *what* to do once logged in. Copy each from its example (`.env.example`, `config.json.example` / `config.yaml.example`) to get started.
+You need **both**: the `.env` file tells the app *who* to log in as, and the config file tells it *what* to do once logged in. Copy each from its example (`.env.example`, `config.json.example`) to get started.
 
 ### Credentials (`.env`)
 
@@ -83,9 +81,9 @@ STRAVA_PASSWORD=eW91ci1zdHJhdmEtcGFzc3dvcmQ=
 
 The app logs in with a real browser (Playwright/Firefox) using these credentials and obtains a session cookie automatically.
 
-### Settings (`config.json` / `config.yaml`)
+### Settings (`config.json`)
 
-Everything below lives in your config file (JSON or YAML)
+Everything below lives in your `config.json` file — **not** in `.env`.
 
 #### Required Fields
 
@@ -102,16 +100,7 @@ Everything below lives in your config file (JSON or YAML)
   - **`minTime`**: Minimum duration in minutes by activity type (e.g., `{"Run": 30, "Ride": 60}`)
   - **`activityNames`**: Array of regex patterns for activity names that always get kudos
 
-### Configuration File Priority
-
-The app looks for config files in this order:
-1. `config.json`
-2. `config.yaml` 
-3. `config.yml`
-
-**Note**: If multiple config files exist, the app will use the first one found in the priority order above and log which file it's using. Only one config file will actually be loaded.
-
-### Example JSON Configuration
+### Example Configuration
 
 ```json
 {
@@ -136,29 +125,6 @@ The app looks for config files in this order:
     ]
   }
 }
-```
-
-### Example YAML Configuration
-
-```yaml
-athleteId: "12345678"
-ignoreAthletes:
-  - "87654321" # Max Mustermann
-  - "11223344" # Sarah Mustermann
-kudosCooldownHours: 36
-kudoRules:
-  minDistance:
-    Run: 5
-    Ride: 20
-    Walk: 2
-  minTime:
-    Run: 30
-    Ride: 60
-    Walk: 15
-  activityNames:
-    - "race|marathon|competition"
-    - "birthday.*run"
-    - "charity"
 ```
 
 ## ⏳ Per-Athlete Cooldown & State
@@ -222,11 +188,7 @@ npm run dev -- --dry-run --verbose # runs the TypeScript sources directly via ts
 Before using Docker, ensure you have a configuration file and a `.env` file with your credentials:
 
 ```bash
-# Create config.yaml from example (recommended)
-cp config.yaml.example config.yaml
-# Edit config.yaml with your actual values
-
-# OR create config.json from example
+# Create config.json from example
 cp config.json.example config.json
 # Edit config.json with your actual values
 
@@ -265,26 +227,23 @@ docker compose down
 # Pull pre-built image
 docker pull ghcr.io/aexel90/strava_kudos:main
 
-# Run with config.yaml (default mount location); mount .env for credentials
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro -v $(pwd)/.env:/app/.env:ro ghcr.io/aexel90/strava_kudos:main
-
-# Run with config.json
+# Run with config.json; mount .env for credentials
 docker run -v $(pwd)/config.json:/app/config.json:ro -v $(pwd)/.env:/app/.env:ro ghcr.io/aexel90/strava_kudos:main
 
 # Build local image
 docker build -t strava-kudos-local .
 
 # Run locally built image
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro -v $(pwd)/.env:/app/.env:ro strava-kudos-local
+docker run -v $(pwd)/config.json:/app/config.json:ro -v $(pwd)/.env:/app/.env:ro strava-kudos-local
 
 # Run with dry-run mode (override default verbose flag)
-docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudos:main node main.js --dry-run --verbose
+docker run -v $(pwd)/config.json:/app/config.json:ro ghcr.io/aexel90/strava_kudos:main node main.js --dry-run --verbose
 ```
 
 ### Docker Configuration
 
 #### Default Behavior
-- **Config file**: Both services mount `config.yaml` by default
+- **Config file**: Both services mount `config.json` by default
 - **Logging**: Containers run with verbose logging (`-v` flag) by default
 - **Restart policy**: Containers restart on failure (max 2 attempts)
 - **Security**: Config files are mounted as read-only (`:ro` flag)
@@ -306,17 +265,17 @@ docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudo
 
 1. **"No configuration file found"**
    ```bash
-   # Ensure you have config.yaml in project root
-   ls -la config.yaml
+   # Ensure you have config.json in project root
+   ls -la config.json
    
    # Or create from example
-   cp config.yaml.example config.yaml
+   cp config.json.example config.json
    ```
 
 2. **Permission denied errors**
    ```bash
    # Check file permissions
-   chmod 644 config.yaml
+   chmod 644 config.json
    ```
 
 3. **Container exits immediately**
@@ -326,13 +285,6 @@ docker run -v $(pwd)/config.yaml:/app/config.yaml:ro ghcr.io/aexel90/strava_kudo
    
    # Run in dry-run mode for testing
    docker compose run --rm strava_kudos node dist/main.js --dry-run --verbose
-   ```
-
-4. **Using different config file**
-   ```bash
-   # Edit docker-compose.yml to mount config.json instead
-   volumes:
-     - ./config.json:/app/config.json:ro
    ```
 
 ## 🏗️ Project Structure
@@ -352,8 +304,7 @@ strava_kudos/
 ├── athleteState.json          # Per-athlete kudos timestamps (auto-generated at runtime)
 ├── tsconfig.json             # TypeScript compiler configuration
 ├── config.json.example       # Example JSON configuration
-├── config.yaml.example       # Example YAML configuration
-├── package.json              # Dependencies: winston, js-yaml, html-entities
+├── package.json              # Dependencies: winston, html-entities
 ├── Dockerfile                # Multi-stage Docker build (compile + runtime)
 ├── docker-compose.yml        # Dual service setup (registry + local)
 └── README.md
@@ -377,21 +328,20 @@ The application is written in **TypeScript** and follows a **modular ES module a
 ### Dependencies
 
 - **`winston@^3.11.0`**: Professional logging with colors and timestamps
-- **`js-yaml@^4.1.0`**: YAML configuration file support
 - **`html-entities@^2.5.2`**: HTML entity decoding for Strava responses
 
 ### Dev Dependencies
 
 - **`typescript`**: Compiler (`tsc`)
 - **`tsx`**: Run TypeScript sources directly during development
-- **`@types/node`**, **`@types/js-yaml`**: Type definitions
+- **`@types/node`**: Type definitions
 
 ## 📋 Troubleshooting
 
 ### Common Issues
 
 1. **"No configuration file found"**
-   - Ensure you have `config.json`, `config.yaml`, or `config.yml` in the project root
+   - Ensure you have `config.json` in the project root
 
 2. **"No `.env` file found" / credential errors**
    - Copy `.env.example` to `.env` and add your base64-encoded `STRAVA_EMAIL` / `STRAVA_PASSWORD`

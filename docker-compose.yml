@@ -4,7 +4,7 @@ services:
     container_name: strava_kudos
     restart: on-failure:2
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      - ./config.json:/app/config.json:ro
       - ./.env:/app/.env:ro
   strava_kudos_local:
     image: strava_kudos_local
@@ -12,5 +12,5 @@ services:
     container_name: strava_kudos_local
     restart: on-failure:2
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
+      - ./config.json:/app/config.json:ro
       - ./.env:/app/.env:ro

@@ -2,7 +2,6 @@ import { readFile, access } from 'fs/promises';
 import { constants as fsConstants } from 'fs';
 import { existsSync } from 'fs';
 import { logger } from './logger.js';
-import yaml from 'js-yaml';
 import type { Config, Credentials, RawConfig } from './types.js';
 
 const DEFAULT_MAX_ACTIVITY_AGE_HOURS = 24;
@@ -55,24 +54,18 @@ function decodeCredential(name: string, value: string | undefined): string {
 }
 
 /**
- * Loads configuration from config.json, config.yaml, or config.yml in the project root.
- * Enforces exclusivity: throws if more than one config file is present.
+ * Loads configuration from config.json in the project root.
  * @returns Parsed config object
  */
 async function loadConfig(): Promise<unknown> {
-    const configFiles = ['config.json', 'config.yaml', 'config.yml'];
-    const found: string[] = [];
+    const configFile = 'config.json';
 
-    for (const file of configFiles) {
-        try {
-            await access(file, fsConstants.F_OK);
-            found.push(file);
-        } catch {} // File doesn't exist, continue to next
+    try {
+        await access(configFile, fsConstants.F_OK);
+    } catch {
+        throw new Error('No configuration file found. Please provide config.json in the project root.');
     }
 
-    if (found.length === 0) throw new Error('No configuration file found. Please provide one of: config.json, config.yaml, or config.yml in the project root.');
-
-    const configFile = found[0];
     logger.info(`Using configuration file: ${configFile}`);
 
     let configRaw: string;
@@ -84,9 +77,7 @@ async function loadConfig(): Promise<unknown> {
     }
 
     try {
-        if (configFile.endsWith('.json')) return JSON.parse(configRaw);
-        else if (configFile.endsWith('.yaml') || configFile.endsWith('.yml')) return yaml.load(configRaw);
-        else throw new Error(`Unsupported config file extension: ${configFile}`);
+        return JSON.parse(configRaw);
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(`Failed to parse configuration file "${configFile}": ${message}`);

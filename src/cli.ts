@@ -61,8 +61,8 @@ Examples:
   node dist/main.js                        # Send kudos to all qualifying activities
 
 Configuration:
-  Place your configuration in config.json, config.yaml, or config.yml
-  See config.json.example or config.yaml.example for reference
+  Place your configuration in config.json
+  See config.json.example for reference
 `);
 }
 
