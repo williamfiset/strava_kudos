@@ -4,8 +4,6 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 
 > This is a fork of [aexel90/strava_kudos](https://github.com/aexel90/strava_kudos). The main difference: login is fully automated end-to-end, including solving Strava's emailed one-time verification code automatically - no manual intervention needed. That makes it easy to run unattended, either as a one-off command or on a schedule (cron/launchd).
 
-[![Docker Image CI](https://github.com/aexel90/strava_kudos/actions/workflows/docker-image.yml/badge.svg)](https://github.com/aexel90/strava_kudos/actions/workflows/docker-image.yml)
-
 ## ✨ Features
 
 - **Smart Activity Filtering**: Configure rules based on activity type, distance, time, and name patterns
