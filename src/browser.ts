@@ -187,7 +187,7 @@ export class StravaBrowser {
             appPassword: emailAppPassword,
             since: new Date(since.getTime() - EMAIL_CLOCK_DRIFT_BUFFER_MS),
         });
-        logger.debug('Retrieved one-time code from email: ' + code);
+        logger.debug('Retrieved one-time code from email');
 
         await page.locator('input[type="number"]:visible').first().fill(code);
         await page.getByRole('button', { name: 'Next', exact: true }).filter({ visible: true }).click();
