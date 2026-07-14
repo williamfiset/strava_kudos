@@ -18,6 +18,8 @@ export interface Credentials {
     stravaEmail: string;
     /** Strava account password. */
     stravaPassword: string;
+    /** Gmail App Password for `stravaEmail`, used to read an emailed one-time login code if Strava asks for one. */
+    gmailAppPassword?: string;
 }
 
 /** Fully normalized configuration consumed by the application. */
@@ -26,6 +28,8 @@ export interface Config {
     stravaEmail: string;
     /** Strava account password; used to log in via the browser and obtain a session cookie. */
     stravaPassword: string;
+    /** Gmail App Password for the Strava account email; used to read an emailed one-time login code if Strava asks for one. */
+    gmailAppPassword?: string;
     athleteId: number;
     ignoreAthletes: (string | number)[];
     maxActivityAgeHours: number;
@@ -108,4 +112,6 @@ export interface CliOptions {
     dryRun: boolean;
     verbose: boolean;
     help: boolean;
+    /** Run the Playwright login browser with a visible window, overriding config.json's `headless`. */
+    headed: boolean;
 }

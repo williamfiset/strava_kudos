@@ -34,8 +34,9 @@ function loadCredentials(): Credentials {
 
     const stravaEmail = decodeCredential('STRAVA_EMAIL', process.env.STRAVA_EMAIL);
     const stravaPassword = decodeCredential('STRAVA_PASSWORD', process.env.STRAVA_PASSWORD);
+    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD ? decodeCredential('GMAIL_APP_PASSWORD', process.env.GMAIL_APP_PASSWORD) : undefined;
 
-    return { stravaEmail, stravaPassword };
+    return { stravaEmail, stravaPassword, gmailAppPassword };
 }
 
 /**
@@ -139,6 +140,7 @@ function normalizeConfig(config: RawConfig, credentials: Credentials): Config {
     return {
         stravaEmail: credentials.stravaEmail,
         stravaPassword: credentials.stravaPassword,
+        gmailAppPassword: credentials.gmailAppPassword,
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
         maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,

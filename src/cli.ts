@@ -13,6 +13,7 @@ export function parseArgs(args: string[] = process.argv): CliOptions {
         dryRun: false,
         verbose: false,
         help: false,
+        headed: false,
     };
 
     for (let i = 2; i < args.length; i++) {
@@ -26,6 +27,9 @@ export function parseArgs(args: string[] = process.argv): CliOptions {
             case '--verbose':
             case '-v':
                 options.verbose = true;
+                break;
+            case '--headed':
+                options.headed = true;
                 break;
             case '--help':
             case '-h':
@@ -54,11 +58,13 @@ Usage: node dist/main.js [options]
 Options:
   -d, --dry-run      Show what would be done without actually sending kudos
   -v, --verbose      Enable verbose logging with detailed activity information
+      --headed       Run the login browser with a visible window (overrides config.json's "headless")
   -h, --help         Show this help message
 
 Examples:
   node dist/main.js --dry-run --verbose    # Preview what would happen
   node dist/main.js                        # Send kudos to all qualifying activities
+  node dist/main.js --headed --dry-run     # Watch the login browser (e.g. to solve a reCAPTCHA)
 
 Configuration:
   Place your configuration in config.json
