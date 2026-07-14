@@ -1,11 +1,4 @@
 services:
-  strava_kudos:
-    image: ghcr.io/aexel90/strava_kudos:main
-    container_name: strava_kudos
-    restart: on-failure:2
-    volumes:
-      - ./config.json:/app/config.json:ro
-      - ./.env:/app/.env:ro
   strava_kudos_local:
     image: strava_kudos_local
     build: .

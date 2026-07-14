@@ -215,65 +215,39 @@ cp .env.example .env
 
 ### Using Docker Compose
 
-The project includes two Docker Compose services:
-
-- **`strava_kudos`**: Uses pre-built image from GitHub Container Registry (recommended)
-- **`strava_kudos_local`**: Builds image locally from current source code
+The project includes one Docker Compose service, `strava_kudos_local`, which builds the image from your current source code:
 
 ```bash
-# Run with GitHub Container Registry image (recommended)
-docker compose up -d strava_kudos
-
-# Build and run local image (for development/testing)
+# Build and run
 docker compose up -d --build strava_kudos_local
 
 # View logs in real-time
-docker compose logs -f strava_kudos
-
-# View logs from specific service
 docker compose logs -f strava_kudos_local
 
-# Stop services
+# Stop
 docker compose down
 ```
 
 ### Using Docker directly
 
 ```bash
-# Pull pre-built image
-docker pull ghcr.io/aexel90/strava_kudos:main
-
-# Run with config.json; mount .env for credentials
-docker run -v $(pwd)/config.json:/app/config.json:ro -v $(pwd)/.env:/app/.env:ro ghcr.io/aexel90/strava_kudos:main
-
-# Build local image
+# Build the image
 docker build -t strava-kudos-local .
 
-# Run locally built image
+# Run it
 docker run -v $(pwd)/config.json:/app/config.json:ro -v $(pwd)/.env:/app/.env:ro strava-kudos-local
 
-# Run with dry-run mode (override default verbose flag)
-docker run -v $(pwd)/config.json:/app/config.json:ro ghcr.io/aexel90/strava_kudos:main node main.js --dry-run --verbose
+# Run in dry-run mode (override the default verbose flag)
+docker run -v $(pwd)/config.json:/app/config.json:ro -v $(pwd)/.env:/app/.env:ro strava-kudos-local node dist/main.js --dry-run --verbose
 ```
 
 ### Docker Configuration
 
-#### Default Behavior
-- **Config file**: Both services mount `config.json` by default
-- **Logging**: Containers run with verbose logging (`-v` flag) by default
-- **Restart policy**: Containers restart on failure (max 2 attempts)
-- **Security**: Config files are mounted as read-only (`:ro` flag)
-
-#### Service Details
-- **`strava_kudos`**: 
-  - Uses `ghcr.io/aexel90/strava_kudos:main` image
-  - Always up-to-date with latest releases
-  - Faster startup (no build time)
-
-- **`strava_kudos_local`**: 
-  - Builds from local Dockerfile
-  - Uses your current source code
-  - Useful for development and testing changes
+- **Config file**: mounted from `config.json` on the host
+- **Logging**: container runs with verbose logging (`-v` flag) by default
+- **Restart policy**: restarts on failure (max 2 attempts)
+- **Security**: `config.json` and `.env` are mounted read-only (`:ro`)
+- **Rebuilding**: the image is only built when you run `docker compose build`/`up --build` — it does not rebuild automatically when the source changes, so rebuild after pulling or editing code
 
 ### Troubleshooting
 
@@ -297,10 +271,10 @@ docker run -v $(pwd)/config.json:/app/config.json:ro ghcr.io/aexel90/strava_kudo
 3. **Container exits immediately**
    ```bash
    # Check logs for errors
-   docker compose logs strava_kudos
+   docker compose logs strava_kudos_local
    
    # Run in dry-run mode for testing
-   docker compose run --rm strava_kudos node dist/main.js --dry-run --verbose
+   docker compose run --rm strava_kudos_local node dist/main.js --dry-run --verbose
    ```
 
 ## 🏗️ Project Structure
