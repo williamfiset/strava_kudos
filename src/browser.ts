@@ -1,14 +1,10 @@
 import { firefox } from 'playwright';
 import type { Page } from 'playwright';
 import { logger } from './logger.js';
-import { fetchStravaLoginCode } from './emailOtp.js';
+import { fetchStravaLoginCode, getMailboxUidNext } from './emailOtp.js';
 
 const LOGIN_URL = 'https://www.strava.com/login';
 const SESSION_COOKIE_NAME = '_strava4_session';
-// Clock drift buffer: how far back to backdate the "since" cutoff when
-// searching for the OTP email, so a slightly-ahead local clock doesn't
-// filter out the email Strava just sent.
-const EMAIL_CLOCK_DRIFT_BUFFER_MS = 60_000;
 
 export interface StravaBrowserOptions {
     /** Run the browser without a visible window. Defaults to `true`. */
@@ -87,7 +83,7 @@ export class StravaBrowser {
             await page.locator('input[name="email"]:visible').fill(email);
 
             logger.debug('Submitting email');
-            const emailSubmittedAt = new Date();
+            const emailOtpBaselineUid = await this.getOtpBaselineUid(email, emailAppPassword);
             await page.locator('[data-cy="login-button"]:visible').click();
 
             // Strava responds to the email submission with either a "use password
@@ -96,7 +92,7 @@ export class StravaBrowser {
             const postEmailState = await this.waitForPostEmailState(page);
 
             if (postEmailState === 'otp') {
-                await this.submitEmailCode(page, email, emailAppPassword, emailSubmittedAt);
+                await this.submitEmailCode(page, email, emailAppPassword, emailOtpBaselineUid);
             } else {
                 logger.debug('Choosing "use password instead"');
                 await page.getByRole('button', { name: /use password instead/i })
@@ -107,7 +103,7 @@ export class StravaBrowser {
                 await page.locator('input[data-cy="password"]:visible').fill(password);
 
                 logger.debug('Submitting password');
-                const passwordSubmittedAt = new Date();
+                const passwordOtpBaselineUid = await this.getOtpBaselineUid(email, emailAppPassword);
                 await page.getByRole('button', { name: 'Log in', exact: true })
                     .filter({ visible: true })
                     .click();
@@ -117,7 +113,7 @@ export class StravaBrowser {
                     .isVisible({ timeout: 5000 })
                     .catch(() => false);
                 if (otpAppeared) {
-                    await this.submitEmailCode(page, email, emailAppPassword, passwordSubmittedAt);
+                    await this.submitEmailCode(page, email, emailAppPassword, passwordOtpBaselineUid);
                 }
             }
 
@@ -170,23 +166,37 @@ export class StravaBrowser {
     }
 
     /**
+     * Notes the mailbox's current UID high-water mark before an action that might
+     * trigger Strava to send a login code, so that code can later be told apart
+     * from an older (possibly already-used) one from a previous nearby attempt.
+     * Returns undefined if no app password is configured or the lookup fails;
+     * `submitEmailCode` surfaces a clear error if a code is then actually needed.
+     */
+    private async getOtpBaselineUid(email: string, emailAppPassword: string | undefined): Promise<number | undefined> {
+        if (!emailAppPassword) return undefined;
+        return getMailboxUidNext(email, emailAppPassword).catch((error) => {
+            logger.debug(`Could not read mailbox UID baseline ahead of a possible OTP request: ${error instanceof Error ? error.message : String(error)}`);
+            return undefined;
+        });
+    }
+
+    /**
      * Reads the one-time code Strava emailed to `email` and submits it on the
      * currently-displayed code screen.
      *
-     * @param since - Only emails received at/after this time are considered, so a
-     *   stale code from an earlier login attempt isn't picked up.
+     * @param baselineUid - Only emails with a UID at/after this are considered, so a
+     *   stale (possibly already-used) code from an earlier login attempt isn't picked up.
      */
-    private async submitEmailCode(page: Page, email: string, emailAppPassword: string | undefined, since: Date): Promise<void> {
+    private async submitEmailCode(page: Page, email: string, emailAppPassword: string | undefined, baselineUid: number | undefined): Promise<void> {
         if (!emailAppPassword) {
             throw new Error('Strava is asking for an emailed one-time code, but no Gmail App Password is configured (GMAIL_APP_PASSWORD in .env) to read it automatically.');
         }
+        if (baselineUid === undefined) {
+            throw new Error('Strava is asking for an emailed one-time code, but the mailbox could not be reached beforehand to establish a starting point. Check the Gmail App Password and try again.');
+        }
 
         logger.debug('Strava requested an emailed one-time code - fetching it from email');
-        const code = await fetchStravaLoginCode({
-            email,
-            appPassword: emailAppPassword,
-            since: new Date(since.getTime() - EMAIL_CLOCK_DRIFT_BUFFER_MS),
-        });
+        const code = await fetchStravaLoginCode({ email, appPassword: emailAppPassword, afterUid: baselineUid });
         logger.debug('Retrieved one-time code from email');
 
         await page.locator('input[type="number"]:visible').first().fill(code);
