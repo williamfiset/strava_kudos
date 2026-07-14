@@ -2,6 +2,8 @@
 
 A Node.js application designed to intelligently automate giving kudos to Strava activities based on configurable rules.
 
+> This is a fork of [aexel90/strava_kudos](https://github.com/aexel90/strava_kudos). The main difference: login is fully automated end-to-end, including solving Strava's emailed one-time verification code automatically - no manual intervention needed. That makes it easy to run unattended, either as a one-off command or on a schedule (cron/launchd).
+
 [![Docker Image CI](https://github.com/aexel90/strava_kudos/actions/workflows/docker-image.yml/badge.svg)](https://github.com/aexel90/strava_kudos/actions/workflows/docker-image.yml)
 
 ## ✨ Features
@@ -10,7 +12,7 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 - **Per-Athlete Cooldown**: Avoids spamming the same athlete — only gives kudos if more than 36 hours have passed since their last one (state persisted in `athleteState.json`)
 - **Dry Run Mode**: Preview actions without actually sending kudos
 - **Simple Configuration**: Plain JSON config file, no extra tooling required
-- **Docker Ready**: Optimized Dockerfile with multi-layer caching and dual Docker Compose setups
+- **Docker Ready**: Optimized Dockerfile with multi-layer caching and a Docker Compose setup
 - **Security First**: 30-second HTTP timeouts, cookie redaction, and read-only volume mounts
 
 ## 🚀 Quick Start
