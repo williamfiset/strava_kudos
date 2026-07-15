@@ -80,8 +80,8 @@ export async function fetchStravaLoginCode(options: FetchStravaLoginCodeOptions)
 
 /**
  * Looks for the most recent matching Strava OTP email with a UID at or after
- * `afterUid` and extracts its code. Returns null if no matching email has
- * arrived yet.
+ * `afterUid` and extracts its code, marking that email as read in the process.
+ * Returns null if no matching email has arrived yet.
  */
 async function findLoginCode(email: string, appPassword: string, afterUid: number): Promise<string | null> {
     const client = createClient(email, appPassword);
@@ -105,7 +105,15 @@ async function findLoginCode(email: string, appPassword: string, afterUid: numbe
                 const parsed = await simpleParser(message.source);
                 const text = parsed.text || parsed.html || '';
                 const match = text.match(CODE_PATTERN);
-                if (match) return match[0];
+                if (match) {
+                    // IMAP's "\Seen" flag is what read/unread status actually is - setting
+                    // it here marks this OTP email as read, so it doesn't sit in the inbox
+                    // looking unread once its code has been used.
+                    await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true }).catch((error) => {
+                        logger.debug(`Could not mark the OTP email as read: ${error instanceof Error ? error.message : String(error)}`);
+                    });
+                    return match[0];
+                }
             }
 
             return null;
