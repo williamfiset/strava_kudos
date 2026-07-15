@@ -7,3 +7,4 @@ services:
     volumes:
       - ./config.json:/app/config.json:ro
       - ./.env:/app/.env:ro
+      - ./athleteState.json:/app/athleteState.json
