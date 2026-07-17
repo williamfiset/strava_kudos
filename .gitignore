@@ -7,3 +7,6 @@ config.yaml
 athleteState.json
 .env
 NOTES-launchd.md
+
+# Personal launchd wrapper script (see NOTES-launchd.md)
+run-kudos.sh
