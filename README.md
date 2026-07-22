@@ -10,8 +10,6 @@ A Node.js application designed to intelligently automate giving kudos to Strava 
 - **Per-Athlete Cooldown**: Avoids spamming the same athlete — only gives kudos if more than 36 hours have passed since their last one (state persisted in `athleteState.json`)
 - **Dry Run Mode**: Preview actions without actually sending kudos
 - **Simple Configuration**: Plain JSON config file, no extra tooling required
-- **Docker Ready**: Optimized Dockerfile with multi-layer caching and a Docker Compose setup
-- **Security First**: 30-second HTTP timeouts, cookie redaction, and read-only volume mounts
 
 ## 🚀 Quick Start
 
@@ -297,7 +295,7 @@ strava_kudos/
 ├── config.json.example       # Example JSON configuration
 ├── package.json              # Dependencies: winston, html-entities
 ├── Dockerfile                # Multi-stage Docker build (compile + runtime)
-├── docker-compose.yml        # Dual service setup (registry + local)
+├── docker-compose.yml        # Local build service setup
 └── README.md
 ```
 
