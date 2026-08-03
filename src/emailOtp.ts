@@ -112,6 +112,15 @@ async function findLoginCode(email: string, appPassword: string, afterUid: numbe
                     await client.messageFlagsAdd(uid, ['\\Seen'], { uid: true }).catch((error) => {
                         logger.debug(`Could not mark the OTP email as read: ${error instanceof Error ? error.message : String(error)}`);
                     });
+
+                    // Gmail's IMAP treats folders as labels, so expunging a message
+                    // flagged \Deleted from INBOX just removes the Inbox label - the
+                    // message itself survives in All Mail. That's exactly "archive"
+                    // (no Trash move needed), so it stops cluttering the inbox.
+                    await client.messageDelete(uid, { uid: true }).catch((error) => {
+                        logger.debug(`Could not archive the OTP email: ${error instanceof Error ? error.message : String(error)}`);
+                    });
+
                     return match[0];
                 }
             }
