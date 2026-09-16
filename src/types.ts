@@ -24,12 +24,24 @@ export interface Credentials {
 
 /** Fully normalized configuration consumed by the application. */
 export interface Config {
-    /** Strava account email; used to log in via the browser and obtain a session cookie. */
-    stravaEmail: string;
-    /** Strava account password; used to log in via the browser and obtain a session cookie. */
-    stravaPassword: string;
+    /**
+     * Strava account email; used to log in via the browser and obtain a session cookie.
+     * Undefined when `sessionCookie` is provided instead, since no login is performed in that case.
+     */
+    stravaEmail?: string;
+    /**
+     * Strava account password; used to log in via the browser and obtain a session cookie.
+     * Undefined when `sessionCookie` is provided instead, since no login is performed in that case.
+     */
+    stravaPassword?: string;
     /** Gmail App Password for the Strava account email; used to read an emailed one-time login code if Strava asks for one. */
     gmailAppPassword?: string;
+    /**
+     * A pre-obtained `_strava4_session` cookie value. When set, the app skips the
+     * browser login flow entirely (no email/password/OTP needed) and uses this
+     * cookie directly. Falls back to the normal login flow when not provided.
+     */
+    sessionCookie?: string;
     athleteId: number;
     ignoreAthletes: (string | number)[];
     maxActivityAgeHours: number;
@@ -46,6 +58,12 @@ export interface Config {
  */
 export interface RawConfig {
     athleteId: string | number;
+    /**
+     * A pre-obtained `_strava4_session` cookie value. When set, the app skips the
+     * browser login flow entirely and uses this cookie directly instead of the
+     * `.env` credentials.
+     */
+    sessionCookie?: string;
     ignoreAthletes?: (string | number)[];
     maxActivityAgeHours?: number | null;
     kudosCooldownHours?: number | null;

@@ -24,13 +24,22 @@ async function main(): Promise<void> {
 
         const config = await loadAndValidateConfig();
 
-        // Log in via the browser to obtain a fresh session cookie
-        logger.info('Logging in to Strava...');
-        logger.debug(`Authenticating as ${config.stravaEmail}`);
-        const browser = new StravaBrowser({ headless: options.headed ? false : config.headless });
-        const sessionCookie = await browser.login(config.stravaEmail, config.stravaPassword, config.gmailAppPassword);
-        logger.info('Login successful - obtained session cookie');
-        logger.logSession(sessionCookie);
+        let sessionCookie: string;
+        if (config.sessionCookie) {
+            // A session cookie was provided directly in config.json - skip the
+            // browser login flow (and the email/password/OTP dance) entirely.
+            logger.info('Using session cookie from config - skipping login');
+            sessionCookie = config.sessionCookie;
+            logger.logSession(sessionCookie);
+        } else {
+            // Log in via the browser to obtain a fresh session cookie
+            logger.info('Logging in to Strava...');
+            logger.debug(`Authenticating as ${config.stravaEmail}`);
+            const browser = new StravaBrowser({ headless: options.headed ? false : config.headless });
+            sessionCookie = await browser.login(config.stravaEmail!, config.stravaPassword!, config.gmailAppPassword);
+            logger.info('Login successful - obtained session cookie');
+            logger.logSession(sessionCookie);
+        }
 
         // Initialize Strava client with the freshly obtained cookie
         const stravaClient = new StravaClient(sessionCookie);

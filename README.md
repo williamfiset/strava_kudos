@@ -55,6 +55,8 @@ This app uses **two separate configuration files**, each with a distinct job:
 
 You need **both**: the `.env` file tells the app *who* to log in as, and the config file tells it *what* to do once logged in. Copy each from its example (`.env.example`, `config.json.example`) to get started.
 
+> **Skipping login:** if you set `sessionCookie` in `config.json` (see [Settings](#settings-configjson)), the app uses that cookie directly and doesn't need `.env` at all. See below.
+
 ### Credentials (`.env`)
 
 Your Strava credentials live in a `.env` file (gitignored), **not** in the config file. The values are stored **base64-encoded** — light obfuscation so they aren't sitting in plain text; this is **not** real encryption.
@@ -108,6 +110,7 @@ Everything below lives in your `config.json` file — **not** in `.env`.
 - **`maxActivityAgeHours`**: Skip activities older than this many hours. Defaults to `24`. Set to `0` to disable.
 - **`kudosCooldownHours`**: Minimum hours between kudos to the same athlete. Defaults to `36`. Set to `0` to disable the cooldown.
 - **`headless`**: Run the Playwright login browser without a visible window. Defaults to `true`. Set to `false` to watch the login (and manually solve a reCAPTCHA if one appears).
+- **`sessionCookie`**: A pre-obtained `_strava4_session` cookie value. When set, the app **skips the browser login flow entirely** (no email/password/OTP, and `.env` isn't required) and uses this cookie directly. Useful for testing or for supplying a cookie obtained some other way. Note that Strava session cookies expire, so this isn't a substitute for the login flow in long-running/scheduled use — once it expires, you'll need to supply a fresh one. Treat it as a secret; keep it out of version control the same as `.env`.
 - **`kudoRules`**: Object containing filtering rules:
   - **`minDistance`**: Minimum distance by activity type (e.g., `{"Run": 5, "Ride": 20}`)
   - **`minTime`**: Minimum duration in minutes by activity type (e.g., `{"Run": 30, "Ride": 60}`)

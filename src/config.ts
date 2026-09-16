@@ -15,9 +15,13 @@ const ENV_FILE = '.env';
  * @returns Validated configuration object
  */
 export async function loadAndValidateConfig(): Promise<Config> {
-    const credentials = loadCredentials();
     const raw = await loadConfig();
     const validated = validateConfig(raw);
+
+    // A configured session cookie bypasses the login flow entirely, so the
+    // .env credentials aren't needed in that case.
+    const credentials = validated.sessionCookie ? undefined : loadCredentials();
+
     return normalizeConfig(validated, credentials);
 }
 
@@ -100,6 +104,11 @@ function validateConfig(config: unknown): RawConfig {
     // Validate athleteId can be converted to number
     if (isNaN(Number(c.athleteId))) throw new Error("'athleteId' must be a valid number");
 
+    // Validate sessionCookie
+    if (c.sessionCookie !== undefined && (typeof c.sessionCookie !== 'string' || !c.sessionCookie.trim())) {
+        throw new Error("'sessionCookie' must be a non-empty string if provided");
+    }
+
     // Validate optional arrays
     if (c.ignoreAthletes && !Array.isArray(c.ignoreAthletes)) throw new Error("'ignoreAthletes' must be an array if provided");
 
@@ -133,14 +142,16 @@ function validateConfig(config: unknown): RawConfig {
 /**
  * Normalizes configuration values and provides defaults
  * @param config - Raw configuration object
- * @param credentials - Strava credentials loaded from the .env file
+ * @param credentials - Strava credentials loaded from the .env file, or undefined when
+ *   `config.sessionCookie` is set and the login flow (and thus credentials) is bypassed
  * @returns Normalized configuration
  */
-function normalizeConfig(config: RawConfig, credentials: Credentials): Config {
+function normalizeConfig(config: RawConfig, credentials: Credentials | undefined): Config {
     return {
-        stravaEmail: credentials.stravaEmail,
-        stravaPassword: credentials.stravaPassword,
-        gmailAppPassword: credentials.gmailAppPassword,
+        stravaEmail: credentials?.stravaEmail,
+        stravaPassword: credentials?.stravaPassword,
+        gmailAppPassword: credentials?.gmailAppPassword,
+        sessionCookie: config.sessionCookie?.trim() || undefined,
         athleteId: Number(config.athleteId),
         ignoreAthletes: config.ignoreAthletes || [],
         maxActivityAgeHours: config.maxActivityAgeHours ?? DEFAULT_MAX_ACTIVITY_AGE_HOURS,
