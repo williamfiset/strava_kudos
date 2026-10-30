@@ -112,22 +112,38 @@ function transformGroupActivity(activity: Record<string, any>): Activity {
     } as Activity;
 }
 
+/** One page of raw feed entries plus whether Strava has more pages available. */
+interface FeedPage {
+    entries: any[];
+    hasMore: boolean;
+}
+
+/** Cursor identifying a feed entry, used to request the next page after it. */
+interface FeedCursor {
+    /** `cursorData.updated_at` of the entry - becomes the `before` query param. */
+    before: number;
+    /** `cursorData.rank` of the entry - becomes the `cursor` query param. */
+    cursor: number;
+}
+
 /**
- * Extracts the raw feed "entries" array from the current Next.js dashboard's
+ * Extracts one page of raw feed entries from the current Next.js dashboard's
  * embedded `__NEXT_DATA__` script tag. Each entry has an `entity` type
  * ('Activity', 'GroupActivity', 'Post', 'Challenge', ...) and either an
  * `activity` object or a group `rowData.activities` array.
- * @returns The entries array, or null if `__NEXT_DATA__` isn't present/parseable
+ * @returns The page, or null if `__NEXT_DATA__` isn't present/parseable
  *   (e.g. Strava reverts to or A/B-tests the older dashboard).
  */
-function extractFeedEntriesFromNextData(htmlData: string): any[] | null {
+function extractFeedPageFromNextData(htmlData: string): FeedPage | null {
     const match = htmlData.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
     if (!match) return null;
 
     try {
         const nextData = JSON.parse(match[1]);
-        const entries = nextData?.props?.pageProps?.dashboardData?.feed?.entries;
-        return Array.isArray(entries) ? entries : null;
+        const feed = nextData?.props?.pageProps?.dashboardData?.feed;
+        const entries = feed?.entries;
+        if (!Array.isArray(entries)) return null;
+        return { entries, hasMore: Boolean(feed?.pagination?.hasMore) };
     } catch (parseError) {
         console.warn('Failed to parse __NEXT_DATA__:', parseError instanceof Error ? parseError.message : String(parseError));
         return null;
@@ -135,11 +151,12 @@ function extractFeedEntriesFromNextData(htmlData: string): any[] | null {
 }
 
 /**
- * Extracts the raw feed entries array from the pre-"dashboard_next" dashboard's
- * `data-react-props` attributes (legacy format, kept as a fallback).
- * @returns The entries array (possibly empty if none are found/parseable)
+ * Extracts one page of raw feed entries from the pre-"dashboard_next" dashboard's
+ * `data-react-props` attributes (legacy format, kept as a fallback). That format
+ * doesn't expose a pagination cursor, so `hasMore` is always false.
+ * @returns The page (possibly with no entries, if none are found/parseable)
  */
-function extractFeedEntriesFromReactProps(htmlData: string): any[] {
+function extractFeedPageFromReactProps(htmlData: string): FeedPage {
     const reactPropsMatches = [...htmlData.matchAll(/data-react-props='([^']+)'/g)].map((match) => match[1]);
     const entries: any[] = [];
 
@@ -153,19 +170,31 @@ function extractFeedEntriesFromReactProps(htmlData: string): any[] {
         }
     });
 
-    return entries;
+    return { entries, hasMore: false };
 }
 
 /**
- * Parse activities from dashboard HTML response. Tries the current Next.js
- * dashboard's `__NEXT_DATA__` format first, falling back to the older
- * `data-react-props` format.
- * @param htmlData - HTML response from dashboard
- * @returns Parsed activities
+ * Finds the pagination cursor for the page *after* the given entries, taken
+ * from the last entry's `cursorData` (every entity type carries one).
+ * @returns The cursor, or null if no entry has usable cursor data
  */
-function parseActivitiesFromDashboard(htmlData: string): Activity[] {
-    const entries = extractFeedEntriesFromNextData(htmlData) ?? extractFeedEntriesFromReactProps(htmlData);
+function getNextCursor(entries: any[]): FeedCursor | null {
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const cursorData = entries[i]?.cursorData;
+        if (cursorData && typeof cursorData.updated_at === 'number' && typeof cursorData.rank === 'number') {
+            return { before: cursorData.updated_at, cursor: cursorData.rank };
+        }
+    }
+    return null;
+}
 
+/**
+ * Converts raw feed entries (as returned by the dashboard page or the
+ * `/dashboard/feed` pagination endpoint) into normalized activities.
+ * @param entries - Raw feed entries
+ * @returns Normalized, deduplicated activities
+ */
+function entriesToActivities(entries: any[]): Activity[] {
     let activities: Activity[] = [];
 
     entries.forEach((entry: any) => {
@@ -208,17 +237,67 @@ export class StravaClient {
     }
 
     /**
-     * Get activities from Strava dashboard
+     * Get activities from Strava dashboard. The initial dashboard page only
+     * embeds its first ~10 feed entries server-side (Strava's current Next.js
+     * dashboard ignores the old `num_entries` param entirely); to reach
+     * `numEntries`, this pages through Strava's `/dashboard/feed` endpoint -
+     * the same one the dashboard's own infinite scroll calls - using the
+     * cursor on the last entry of each page.
      * @param myAthleteID - User's athlete ID
-     * @param numEntries - Number of entries to fetch
+     * @param numEntries - Minimum number of raw feed entries to fetch before stopping.
+     *   Defaults high enough that a normal run walks the feed to Strava's own
+     *   natural end (`hasMore: false`, observed around ~150 entries) rather than
+     *   an arbitrary cutoff; the page-count safety cap is the real backstop.
      * @returns Array of activities
      */
-    async getActivitiesViaDashboard(myAthleteID: number, numEntries = 60): Promise<Activity[]> {
+    async getActivitiesViaDashboard(myAthleteID: number, numEntries = 200): Promise<Activity[]> {
         if (!this.csrfToken) throw new Error('Client not initialized. Call initialize() first.');
 
         const options: https.RequestOptions = {
             hostname: 'www.strava.com',
-            path: `/dashboard?num_entries=${numEntries}&${DASHBOARD_NEXT_PARAM}`,
+            path: `/dashboard?${DASHBOARD_NEXT_PARAM}`,
+            method: 'GET',
+            headers: {
+                'Cookie': this.cookieValue,
+                'x-csrf-token': this.csrfToken,
+            },
+        };
+
+        const html = await makeRequest(options, this.timeout);
+        const firstPage = extractFeedPageFromNextData(html) ?? extractFeedPageFromReactProps(html);
+
+        const entries: any[] = [...firstPage.entries];
+        let hasMore = firstPage.hasMore;
+        let cursor = getNextCursor(firstPage.entries);
+
+        // Safety cap so a pagination quirk (e.g. hasMore staying true with no
+        // new entries) can't turn into an unbounded request loop.
+        const MAX_FEED_PAGES = 10;
+        for (let page = 0; page < MAX_FEED_PAGES && entries.length < numEntries && hasMore && cursor; page++) {
+            const nextPage = await this.fetchFeedPage(myAthleteID, cursor);
+            if (nextPage.entries.length === 0) break;
+
+            entries.push(...nextPage.entries);
+            hasMore = nextPage.hasMore;
+            cursor = getNextCursor(nextPage.entries) ?? cursor;
+        }
+
+        return entriesToActivities(entries);
+    }
+
+    /**
+     * Fetch one page of the "following" feed from Strava's pagination endpoint
+     * (the one the dashboard's own infinite scroll uses), starting after `cursor`.
+     * @param myAthleteID - User's athlete ID
+     * @param cursor - Cursor identifying the last entry already fetched
+     * @returns The next page of raw feed entries
+     */
+    private async fetchFeedPage(myAthleteID: number, cursor: FeedCursor): Promise<FeedPage> {
+        if (!this.csrfToken) throw new Error('Client not initialized. Call initialize() first.');
+
+        const options: https.RequestOptions = {
+            hostname: 'www.strava.com',
+            path: `/dashboard/feed?feed_type=following&athlete_id=${myAthleteID}&before=${cursor.before}&cursor=${cursor.cursor}`,
             method: 'GET',
             headers: {
                 'Cookie': this.cookieValue,
@@ -227,7 +306,16 @@ export class StravaClient {
         };
 
         const data = await makeRequest(options, this.timeout);
-        return parseActivitiesFromDashboard(data);
+
+        let parsed: any;
+        try {
+            parsed = JSON.parse(data);
+        } catch (parseError) {
+            throw new Error(`Failed to parse /dashboard/feed response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        }
+
+        const entries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+        return { entries, hasMore: Boolean(parsed?.pagination?.hasMore) };
     }
 
     /**
