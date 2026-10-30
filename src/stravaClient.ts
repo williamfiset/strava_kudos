@@ -8,6 +8,14 @@ interface StravaClientOptions {
 }
 
 /**
+ * As of late 2026, Strava redirects `/dashboard` requests to a Next.js-based
+ * dashboard behind this query param (`GET /dashboard` 302s to
+ * `/dashboard?dashboard_next=1` even with a valid session). Requesting it
+ * directly avoids that redirect, which this app's HTTP client doesn't follow.
+ */
+const DASHBOARD_NEXT_PARAM = 'dashboard_next=1';
+
+/**
  * Internal helper function to make HTTP requests
  * @param options - Request options
  * @param timeout - Request timeout in milliseconds
@@ -64,7 +72,7 @@ function makeRequest(options: https.RequestOptions, timeout: number): Promise<st
 async function getCsrfToken(cookieValue: string, timeout: number): Promise<string> {
     const options: https.RequestOptions = {
         hostname: 'www.strava.com',
-        path: '/dashboard',
+        path: `/dashboard?${DASHBOARD_NEXT_PARAM}`,
         method: 'GET',
         headers: {
             Cookie: cookieValue,
@@ -72,7 +80,9 @@ async function getCsrfToken(cookieValue: string, timeout: number): Promise<strin
     };
 
     const data = await makeRequest(options, timeout);
-    const csrfTokenMatch = data.match(/<meta name="csrf-token" content="([^"]+)"/);
+    // The pre-"dashboard_next" page used name="csrf-token"; the current Next.js
+    // dashboard renamed the meta tag to name="csrf". Accept either.
+    const csrfTokenMatch = data.match(/<meta name="csrf(?:-token)?" content="([^"]+)"/);
 
     if (csrfTokenMatch) {
         const csrfToken = csrfTokenMatch[1];
@@ -103,28 +113,64 @@ function transformGroupActivity(activity: Record<string, any>): Activity {
 }
 
 /**
- * Parse activities from dashboard HTML response
- * @param htmlData - HTML response from dashboard
- * @returns Parsed activities
+ * Extracts the raw feed "entries" array from the current Next.js dashboard's
+ * embedded `__NEXT_DATA__` script tag. Each entry has an `entity` type
+ * ('Activity', 'GroupActivity', 'Post', 'Challenge', ...) and either an
+ * `activity` object or a group `rowData.activities` array.
+ * @returns The entries array, or null if `__NEXT_DATA__` isn't present/parseable
+ *   (e.g. Strava reverts to or A/B-tests the older dashboard).
  */
-function parseActivitiesFromDashboard(htmlData: string): Activity[] {
-    const reactPropsMatches = [...htmlData.matchAll(/data-react-props='([^']+)'/g)].map((match) => match[1]);
+function extractFeedEntriesFromNextData(htmlData: string): any[] | null {
+    const match = htmlData.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (!match) return null;
 
-    let activities: Activity[] = [];
+    try {
+        const nextData = JSON.parse(match[1]);
+        const entries = nextData?.props?.pageProps?.dashboardData?.feed?.entries;
+        return Array.isArray(entries) ? entries : null;
+    } catch (parseError) {
+        console.warn('Failed to parse __NEXT_DATA__:', parseError instanceof Error ? parseError.message : String(parseError));
+        return null;
+    }
+}
+
+/**
+ * Extracts the raw feed entries array from the pre-"dashboard_next" dashboard's
+ * `data-react-props` attributes (legacy format, kept as a fallback).
+ * @returns The entries array (possibly empty if none are found/parseable)
+ */
+function extractFeedEntriesFromReactProps(htmlData: string): any[] {
+    const reactPropsMatches = [...htmlData.matchAll(/data-react-props='([^']+)'/g)].map((match) => match[1]);
+    const entries: any[] = [];
 
     reactPropsMatches.forEach((match) => {
         try {
             const reactProps = JSON.parse(decode(match));
-            const entries = reactProps?.appContext?.feedProps?.preFetchedEntries || [];
-
-            entries.forEach((entry: any) => {
-                if (entry.entity === 'Activity') activities.push(entry.activity);
-                else if (entry.entity === 'GroupActivity') activities.push(...entry.rowData.activities.map(transformGroupActivity));
-            });
+            entries.push(...(reactProps?.appContext?.feedProps?.preFetchedEntries || []));
         } catch (parseError) {
             // Skip malformed JSON, continue processing
             console.warn('Failed to parse react props:', parseError instanceof Error ? parseError.message : String(parseError));
         }
+    });
+
+    return entries;
+}
+
+/**
+ * Parse activities from dashboard HTML response. Tries the current Next.js
+ * dashboard's `__NEXT_DATA__` format first, falling back to the older
+ * `data-react-props` format.
+ * @param htmlData - HTML response from dashboard
+ * @returns Parsed activities
+ */
+function parseActivitiesFromDashboard(htmlData: string): Activity[] {
+    const entries = extractFeedEntriesFromNextData(htmlData) ?? extractFeedEntriesFromReactProps(htmlData);
+
+    let activities: Activity[] = [];
+
+    entries.forEach((entry: any) => {
+        if (entry.entity === 'Activity') activities.push(entry.activity);
+        else if (entry.entity === 'GroupActivity') activities.push(...entry.rowData.activities.map(transformGroupActivity));
     });
 
     if (activities.length === 0) throw new Error('No activities found - check session cookie validity');
@@ -172,7 +218,7 @@ export class StravaClient {
 
         const options: https.RequestOptions = {
             hostname: 'www.strava.com',
-            path: `/dashboard?num_entries=${numEntries}`,
+            path: `/dashboard?num_entries=${numEntries}&${DASHBOARD_NEXT_PARAM}`,
             method: 'GET',
             headers: {
                 'Cookie': this.cookieValue,
